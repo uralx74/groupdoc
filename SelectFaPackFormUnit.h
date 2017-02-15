@@ -14,6 +14,9 @@
 #include "FaTypes.h"
 #include "OtdelenComboBoxFrameUnit.h"
 #include <DBCtrls.hpp>
+#include <ComCtrls.hpp>
+#include <ActnList.hpp>
+#include <StdActns.hpp>
 
 //---------------------------------------------------------------------------
 class TSelectFaPackForm : public TForm
@@ -36,10 +39,14 @@ __published:	// IDE-managed Components
     TLabel *Label5;
     TButton *Button5;
     TDBLookupComboBox *OtdelenComboBox2;
+    TActionList *ActionList1;
+    TButton *Button6;
+    TAction *CloseWindowAction;
     void __fastcall FormCreate(TObject *Sender);
     void __fastcall faListGridChangeCheck(TObject *Sender);
     void __fastcall FilterComboBoxChange(TObject *Sender);
     void __fastcall OtdelenComboBox2Click(TObject *Sender);
+    void __fastcall CloseWindowActionExecute(TObject *Sender);
 private:	// User declarations
     String _faPackId;
     //String _faPackType;
@@ -48,7 +55,7 @@ private:	// User declarations
 
 public:		// User declarations
     __fastcall TSelectFaPackForm(TComponent* Owner);
-    bool __fastcall execute();
+    bool __fastcall execute(String acctOtdelen, String faPackTypeCd);
     FaPack getFaPack();
     String __fastcall getFaPackId();
     //FaTypes::PackTypeId __fastcall getFaPackTypeId();

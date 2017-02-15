@@ -1,5 +1,3 @@
-//---------------------------------------------------------------------------
-
 #include <vcl.h>
 #pragma hdrstop
 
@@ -14,6 +12,7 @@ USEFORM("EditCcFormUnit.cpp", EditCcForm);
 USEFORM("FormSpecialModuleUnit.cpp", FormSpecialModule); /* TDataModule: File Type */
 USEFORM("DocumentDataModuleUnit.cpp", DocumentDataModule); /* TDataModule: File Type */
 USEFORM("..\util\FormLogin\formlogin.cpp", LoginForm);
+USEFORM("WaitFormUnit.cpp", WaitForm);
 //---------------------------------------------------------------------------
 /*
 
@@ -55,3 +54,4 @@ WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     return 0;
 }
 //---------------------------------------------------------------------------
+

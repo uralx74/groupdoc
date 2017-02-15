@@ -71,10 +71,11 @@ void __fastcall TSelectFaPackForm::faListGridChangeCheck(TObject *Sender)
 }
 
 /* Главная вызываемая функция */
-bool __fastcall TSelectFaPackForm::execute()
+bool __fastcall TSelectFaPackForm::execute(String acctOtdelen, String faPackTypeCd)
 {
-    OtdelenComboBox2->KeyValue = MainDataModule->getAcctOtdelen();
-    MainDataModule->getFaPackList();
+    //OtdelenComboBox2->KeyValue = MainDataModule->getAcctOtdelen();
+    OtdelenComboBox2->KeyValue = acctOtdelen;
+    MainDataModule->getFaPackList(acctOtdelen, faPackTypeCd);
 
     //_faPack.clear();
     return this->ShowModal() == mrOk;
@@ -112,6 +113,11 @@ void __fastcall TSelectFaPackForm::OtdelenComboBox2Click(TObject *Sender)
     MainDataModule->selectFaPackQuery->ParamByName("acct_otdelen")->Value = OtdelenComboBox2->KeyValue;
     MainDataModule->openOrRefresh(MainDataModule->selectFaPackQuery);
 }
-//---------------------------------------------------------------------------
 
+/**/
+void __fastcall TSelectFaPackForm::CloseWindowActionExecute(TObject *Sender)
+{
+    ModalResult = mrCancel;
+}
+//---------------------------------------------------------------------------
 

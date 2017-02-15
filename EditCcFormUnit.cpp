@@ -174,3 +174,10 @@ void __fastcall TEditCcForm::FormCreate(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
+void __fastcall TEditCcForm::CloseWindowActionExecute(TObject *Sender)
+{
+    ModalResult = mrCancel;
+  
+}
+//---------------------------------------------------------------------------
+

@@ -20,6 +20,7 @@
 #include "Ora.hpp"
 #include "OraSmart.hpp"
 #include <Provider.hpp>
+#include <Dialogs.hpp>
 
 //---------------------------------------------------------------------------
 class TDocumentDataModule : public TDataModule
@@ -28,8 +29,14 @@ __published:	// IDE-managed Components
     TClientDataSet *ClientDataSet1;
     TOraTable *mergeDataSet;
     TDataSetProvider *mergeDataSetProvider;
+    TSaveDialog *SaveDialog1;
+    TOpenDialog *OpenDialog1;
 private:	// User declarations
     TDocumentWriter* documentWriter;
+    
+    String __fastcall askExcelFileName();
+    String __fastcall askWordFileName();
+
     void __fastcall BeginPrint(TDataSetFilter* mergeFields);
     void __fastcall EndPrint(TDataSetFilter* mergeFields);
 
@@ -39,8 +46,8 @@ public:		// User declarations
     void __fastcall getDocumentFaNoticesList(TDataSetFilter *mergeFields);
     void __fastcall getDocumentFaNotices(TDataSetFilter* mergeFields);
     //void __fastcall getDocumentFaNotices(TDataSet *mergeFields, TDataSet* formFields);
-
-
+    void __fastcall getDocumentStopService(TDataSetFilter *mergeFields);
+    void __fastcall getDocumentStopService();
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TDocumentDataModule *DocumentDataModule;
