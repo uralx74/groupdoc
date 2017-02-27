@@ -23,7 +23,8 @@
 #include <DBClient.hpp>
 #include "OraSmart.hpp"
 #include <Provider.hpp>
-
+#include "OraSmart.hpp"
+#include "Messages.h"
 
 namespace TCheckTypes
 {
@@ -98,8 +99,9 @@ enum Type
     FA = 10,
     OTHER = 20
 };
-}
+}    
 
+/*
 namespace TPackTypeCd
 {
 enum Type
@@ -109,7 +111,16 @@ enum Type
     PACK_POST = 30,
     PACK_STOP = 40
 };
-}
+}  */
+
+typedef enum _TFaPackTypeCd
+{
+    FPT_UNDEFINED = 0,
+    FPT_MANUAL = 10,
+    FPT_POST = 20,
+    FPT_STOP = 40
+
+} TFaPackTypeCd;
 
 //---------------------------------------------------------------------------
 class TMainDataModule : public TDataModule
@@ -142,20 +153,6 @@ __published:	// IDE-managed Components
     TStringField *OraQuery2ACCT_OTDELEN;
     TStringField *OraQuery2SERVICE_ORG;
     TOraDataSource *getFaPackDataSource;
-    TFloatField *getDebtorsROWNUM;
-    TStringField *getDebtorsACCT_ID;
-    TStringField *getDebtorsFIO;
-    TStringField *getDebtorsCITY;
-    TStringField *getDebtorsADDRESS;
-    TFloatField *getDebtorsSALDO_UCH;
-    TFloatField *getDebtorsSALDO_M3;
-    TDateTimeField *getDebtorsCC_DTTM;
-    TStringField *getDebtorsFA_ID;
-    TStringField *getDebtorsFA_PACK_ID;
-    TDateTimeField *getDebtorsCRE_DTTM;
-    TStringField *getDebtorsACCT_OTDELEN;
-    TStringField *getDebtorsSERVICE_ORG;
-    TFloatField *getDebtorsCHECK_DATA;
     TOraStoredProc *addCcProc;
     TOraStoredProc *setCcStatusFlgProc;
     TOraQuery *getApprovalListQuery;
@@ -259,18 +256,6 @@ __published:	// IDE-managed Components
     TStringField *getFaPackQueryPHONE;
     TStringField *getFaPackQueryPOSTAL;
     TOraQuery *getFaPackInfo;
-    TFloatField *getFaPackInfoROWNUM;
-    TDateTimeField *getFaPackInfoSYSDATE;
-    TDateTimeField *getFaPackInfoCRE_DTTM;
-    TStringField *getFaPackInfoACCT_OTDELEN;
-    TStringField *getFaPackInfoFA_PACK_ID;
-    TStringField *getFaPackInfoACCT_OTDELEN_DESCR;
-    TStringField *getFaPackInfoADDRESS;
-    TStringField *getFaPackInfoPOST;
-    TStringField *getFaPackInfoPHONE;
-    TStringField *getFaPackInfoNACHALNIK;
-    TStringField *getFaPackInfoVISA;
-    TStringField *getDebtorsOP_AREA_DESCR;
     TStringField *getFaPackQueryOP_AREA_DESCR;
     TOraQuery *getConfigQuery;
     TOraQuery *OraQuery33333333333333;
@@ -322,14 +307,6 @@ __published:	// IDE-managed Components
     TDateTimeField *getFaPackStopInfoQueryCRE_DTTM;
     TStringField *getFaPackStopInfoQueryACCT_OTDELEN;
     TStringField *getFaPackStopInfoQueryFA_PACK_ID;
-    TStringField *getOtdelenListQueryFNAME;
-    TIntegerField *getOtdelenListQueryACCT_OTDELEN;
-    TStringField *getOtdelenListQueryADDRESS;
-    TStringField *getOtdelenListQueryNACHALNIK;
-    TStringField *getOtdelenListQueryPHONE;
-    TStringField *getOtdelenListQueryCCB_ACCT_CHAR_VAL;
-    TStringField *getOtdelenListQueryVISA;
-    TStringField *getOtdelenListQueryPOST;
     TOraQuery *getPackStopListQuery;
     TOraDataSource *getPackStopListDataSource;
     TDataSetFilter *getPackStopListFilter;
@@ -352,12 +329,72 @@ __published:	// IDE-managed Components
     TStringField *getConfigQueryREPORT_PATH;
     TStringField *getConfigQueryUSERNAME;
     TVirtualTable *getDebtorsRam;
+    TFloatField *getFaPackInfoROWNUM;
+    TDateTimeField *getFaPackInfoSYSDATE;
+    TDateTimeField *getFaPackInfoCRE_DTTM;
+    TStringField *getFaPackInfoACCT_OTDELEN;
+    TStringField *getFaPackInfoFA_PACK_ID;
+    TFloatField *getFaPackInfoFA_COUNT;
+    TStringField *getOtdelenListQueryOTDELEN_DESCR;
+    TIntegerField *getOtdelenListQueryACCT_OTDELEN;
+    TStringField *getOtdelenListQueryADDRESS;
+    TStringField *getOtdelenListQueryNACHALNIK;
+    TStringField *getOtdelenListQueryPHONE;
+    TStringField *getOtdelenListQueryCCB_ACCT_CHAR_VAL;
+    TStringField *getOtdelenListQueryVISA;
+    TStringField *getOtdelenListQueryPOST;
+    TFloatField *selectFaPackQueryFA_CNT;
+    TFloatField *getDebtorsROWNUM;
+    TFloatField *getDebtorsCHECK_DATA;
+    TStringField *getDebtorsACCT_ID;
+    TStringField *getDebtorsFIO;
+    TStringField *getDebtorsCITY;
+    TStringField *getDebtorsADDRESS;
+    TFloatField *getDebtorsSALDO_UCH;
+    TFloatField *getDebtorsSALDO_M3;
+    TDateTimeField *getDebtorsCC_DTTM;
+    TStringField *getDebtorsFA_ID;
+    TStringField *getDebtorsFA_PACK_ID;
+    TDateTimeField *getDebtorsCRE_DTTM;
+    TStringField *getDebtorsACCT_OTDELEN;
+    TStringField *getDebtorsSERVICE_ORG;
+    TStringField *getDebtorsOP_AREA_DESCR;
+    TFloatField *getFaPackQueryCONT_QTY_SZ;
+    TFloatField *getFaPackQueryEND_REG_READING_SZ1;
+    TOraDataSource *getPostListDataSource;
+    TOraQuery *getPostListQuery;
+    TDataSetFilter *getPostListFilter;
+    TVirtualTable *getPostListRam;
+    TStringField *getPostListQueryACCT_ID;
+    TDateTimeField *getPostListQueryCRE_DTTM;
+    TFloatField *getPostListQuerySALDO_BT_UCH;
+    TFloatField *getPostListQuerySALDO_AKT_UCH;
+    TStringField *getPostListQueryFIO;
+    TStringField *getPostListQueryCITY;
+    TStringField *getPostListQueryADDRESS;
+    TFloatField *getPostListQuerySALDO_UCH;
+    TFloatField *getPostListQuerySALDO_M3;
+    TFloatField *getPostListQueryNORMATIV;
+    TStringField *getPostListQuerySERVICE_ORG;
+    TStringField *getPostListQueryOP_AREA_DESCR;
+    TFloatField *getPostListQueryFL_TAR11;
+    TFloatField *getPostListQueryROWNUM;
+    TFloatField *getPostListQueryCHECK_DATA;
+    TOraQuery *getFaPackType;
+    TStringField *StringField21;
+    TIntegerField *IntegerField1;
+    TStringField *StringField22;
+    TStringField *StringField23;
+    TStringField *StringField24;
+    TStringField *StringField25;
+    TStringField *StringField26;
+    TStringField *StringField42;
+    TStringField *selectFaPackQueryFA_PACK_TYPE_DESCR;
     void __fastcall DataModuleCreate(TObject *Sender);
+    void __fastcall OnFilterChange(TDataSetFilter *Sender,
+          AnsiString filterName);
 private:	// User declarations
     bool __fastcall Auth();
-    String __fastcall createPackNotice(TDataSetFilter* filter, const String& acctOtdelen);
-    String __fastcall createPackStop(TDataSetFilter* filter, const String& acctOtdelen);
-    //TNotifyEvent FOnQueryAfterExecuteEvent;
 
     void __fastcall OnShowDebtorsThreadEnd(TDataSet* ds);
     TThreadDataSet* _threadDataSet; // Поток для открытия запросов
@@ -365,6 +402,11 @@ private:	// User declarations
     /* Синхронизация с графическим интерфейсом */
     TNotifyEvent _afterOpenDataSet;
     TNotifyEvent _beforeOpenDataSet;
+    TNotifyEvent _onChangeFilterMethod;
+
+    TField* _acctOtdelen;           // Текущее отделение
+    TDataSetFilter* _currentFilter; // Текущий фильтр
+
 
 
 public:		// User declarations
@@ -377,7 +419,10 @@ public:		// User declarations
 
     //void __fastcall setAfterOpenEvent(TNotifyEvent event);
     void __fastcall setOpenDataSetEvents(TNotifyEvent beforeOpenDataSet, TNotifyEvent afterOpenDataSet);
+    void __fastcall setOnChangeFilterMethod(TNotifyEvent onChangeFilterMethod);
 
+    /* Для последующего обновления */
+    void __fastcall closeDebtorsQuery();
 
 
     TUserRole::TRoleTypes userRole; // Роль пользоваля
@@ -396,10 +441,10 @@ public:		// User declarations
     String setCcApprovalDttm(String ccId, bool cancelApproval = false);
     void setCcApprovalDttmSelected(bool cancelApproval = false);
 
-    String __fastcall createPackNotice();
+    String __fastcall createPackNotice(TFaPackTypeCd faPackTypeCd = FPT_UNDEFINED);
     String __fastcall createPackStop();
 
-    String __fastcall createPackMulti(TDataSetFilter* filter, TPackTypeCd::Type packTypeCd, const String& acctOtdelen);
+    String __fastcall createPackMulti(TDataSetFilter* filter, TFaPackTypeCd faPackTypeCd, const String& acctOtdelen);
     //String __fastcall createPack(TPackTypeCd::Type packTypeCd);
 
     /* Connect with form */
@@ -411,32 +456,37 @@ public:		// User declarations
     void __fastcall setCheckAll(TDataSet* dataSet, bool value);
 
     /* Отображаемы списки */
-    void __fastcall getDebtorList(const String& acctOtdelen);
-    void __fastcall getApprovalList(const String& acctOtdelen);
-    void __fastcall getStopList(const String& acctOtdelen);
-    void __fastcall getPackStopList(const String& acctOtdelen);
+    void __fastcall getDebtorList();
+    void __fastcall getPostList();
+    void __fastcall getApprovalList();
+    void __fastcall getStopList();
+    void __fastcall getPackStopList();
 
     /* Вспомогательные запросы */
     //void __fastcall getFaPack(const String& faPackId, String& acctOtdelen);
     void __fastcall getFaPack(const String& faPackId);
 
 
-    void __fastcall getFaPackList(String acctOtdelen, String faPackTypeCd);
+    void __fastcall getFaPackList(String faPackTypeCd);
 
     //void __fastcall clearAllFilters();
 
     /**/
     void __fastcall setAcctOtdelen(const String& acctOtdelen, bool updateOnly = false);
+    //String __fastcall getAcctOtdelenByFaPackId(const String& faPackId);
     String __fastcall getAcctOtdelen();
+
+    void __fastcall setFaPack(const String& faPackId);
+
 
     void __fastcall setFaPackId_Notice(const String& faPackId);
     void __fastcall setFaPackId_Stop(const String& faPackId);
     String __fastcall getFaPackId_Notice();
     String __fastcall getFaPackId_Stop();
 
-    String _currentFaPackTypeCd;      // Тип текущего реестр
-    String _currentFaPackId;      // Текущий реестр
-    String _currentAcctOtdelen;     // Текущий участок
+    //String _currentFaPackTypeCd;      // Тип текущего реестр
+    //String _currentFaPackId;      // Текущий реестр
+    //String _currentAcctOtdelen;     // Текущий участок
 
 };
 //---------------------------------------------------------------------------

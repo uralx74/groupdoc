@@ -79,7 +79,7 @@ String __fastcall TDocumentDataModule::askWordFileName()
 }
 
 
-/* Печать уведомлений*/
+/* Печать уведомлений */
 void __fastcall TDocumentDataModule::getDocumentFaNotices(TDataSetFilter* mergeFields)
 {
     String resultFilename = askWordFileName();
@@ -92,28 +92,28 @@ void __fastcall TDocumentDataModule::getDocumentFaNotices(TDataSetFilter* mergeF
     wordExportParams.resultFilename = ExtractFilePath(resultFilename) + ExtractFileName(resultFilename) + "_[:counter].doc";
 
 
-   //wordExportParams.resultFilename = "c:\\PROGRS\\current\\GroupDoc\\report\\document_notice_[:counter].doc";
-    wordExportParams.pagePerDocument = 500;
+      wordExportParams.pagePerDocument = 500;
     /* Присоединяем источники данных */
     wordExportParams.templateFilename = MainDataModule->getConfigQuery->FieldByName("report_path")->AsString + "\\template_document_notice.dotx";
     wordExportParams.addSingleImageDataSet(MainDataModule->getOtdelenListQuery, "image_");     // Общая информация по участку
     wordExportParams.addSingleTextDataSet(MainDataModule->getOtdelenListQuery, "otdelen_");     // Общая информация по участку
-    wordExportParams.addSingleTextDataSet(MainDataModule->getPackStopListFilter->DataSet, "rec_");  // Информация по реестру
+    //wordExportParams.addSingleTextDataSet(MainDataModule->getPackStopListFilter->DataSet, "rec_");  // Информация по реестру
     wordExportParams.addMergeDataSet(mergeFields->DataSet);
 
     //wordExportParams.addSingleDataSet(MainDataModule->getPackStopListFilter->DataSet, "rec_");  // Информация по реестру
     //wordExportParams.addTableDataSet(MainDataModule->getFaPackStopQuery, 1, "table_");                  // Информация для таблицы
 
 
-
     // Далее фильтруем выделенные и формируем документы
     BeginPrint(mergeFields);
+
+    mergeFields->DataSet->First();
 
     if ( mergeFields->DataSet->RecordCount > 0)
     {
         // Получаем дополнительные данные для полей документа
-        MainDataModule->getFaPackInfo->ParamByName("fa_pack_id")->Value = mergeFields->DataSet->FieldByName("fa_pack_id")->Value;
-        MainDataModule->openOrRefresh(MainDataModule->getFaPackInfo);
+        //MainDataModule->getFaPackInfo->ParamByName("fa_pack_id")->Value = mergeFields->DataSet->FieldByName("fa_pack_id")->Value;
+        //MainDataModule->openOrRefresh(MainDataModule->getFaPackInfo);
 
         // Формируем документ
         documentWriter->ExportToWordTemplate(&wordExportParams);
@@ -134,11 +134,15 @@ void __fastcall TDocumentDataModule::getDocumentFaNoticesList(TDataSetFilter *me
     }
 
     TExcelExportParams excelExportParams;
-    excelExportParams.templateFilename = MainDataModule->getConfigQuery->FieldByName("report_path")->AsString + "\\template_document_notice.xltx";
+    excelExportParams.templateFilename = MainDataModule->getConfigQuery->FieldByName("report_path")->AsString + "template_document_notice.xltx";
     //excelExportParams.templateFilename = "c:\\PROGRS\\current\\GroupDoc\\report\\template_document_notice.xltx";
     excelExportParams.resultFilename = ChangeFileExt(resultFilename,".xlsx");
     //excelExportParams.resultFilename = ExtractFilePath(resultFilename) + ExtractFileName(resultFilename) + ".xlsx";
-    excelExportParams.table_range_name = "range_body";
+    //excelExportParams.table_range_name = "range_body";
+    excelExportParams.addSingleDataSet(MainDataModule->getFaPackInfo, "pack_rec_");     // Общая информация по участку
+
+    excelExportParams.addSingleDataSet(MainDataModule->getOtdelenListQuery, "otdelen_rec_");     // Общая информация по участку
+    excelExportParams.addTableDataSet(mergeFields->DataSet, "range_body", "");     // Общая информация по участку
 
 
     BeginPrint(mergeFields);
@@ -146,18 +150,15 @@ void __fastcall TDocumentDataModule::getDocumentFaNoticesList(TDataSetFilter *me
     if ( mergeFields->DataSet->RecordCount > 0)
     {
         // Получаем дополнительные данные для полей документа
-        MainDataModule->getFaPackInfo->ParamByName("fa_pack_id")->Value = mergeFields->DataSet->FieldByName("fa_pack_id")->Value;
-        MainDataModule->openOrRefresh(MainDataModule->getFaPackInfo);
+        //MainDataModule->getFaPackInfo->ParamByName("fa_pack_id")->Value = mergeFields->DataSet->FieldByName("fa_pack_id")->Value;
+        //MainDataModule->openOrRefresh(MainDataModule->getFaPackInfo);
 
         // Формируем документ
         //documentWriter->ExportToExcelTemplate(&excelExportParams, filter->DataSet, MainDataModule->getOtdelenListQuery);
-        documentWriter->ExportToExcelTemplate(&excelExportParams, mergeFields->DataSet, MainDataModule->getFaPackInfo);
+        documentWriter->ExportToExcelTemplate(&excelExportParams);
     }
     EndPrint(mergeFields);
-
 }
-
-
 
 /* Печать списка заявок на ограничение - устаревшая */
 void __fastcall TDocumentDataModule::getDocumentStopService(TDataSetFilter *mergeFields)

@@ -58,7 +58,10 @@ typedef enum   {
     SHEET_TYPE_UNDEFINED = 0,
     SHEET_TYPE_DEBTORS,         // general
     SHEET_TYPE_NOTICES_PACK,    //PACK_MANUAL,
-    SHEET_TYPE_APPROVE,//,
+    SHEET_TYPE_APPROVE,
+
+    SHEET_TYPE_POST_LIST,
+    //SHEET_TYPE_POST_PACK,
 
     SHEET_TYPE_STOP,
     SHEET_TYPE_PACK_STOP_LIST,  // Список реестров на отключение
@@ -82,7 +85,8 @@ public:
 
     //void addAction(TAction* action);
     // std::vector<Action*> filters; // Список доступных фильтров
-    //void assignMode(PackMode packModeId);
+
+    /* actions */
     void assignSheet(TTabSheet* sheet, bool accessible = false);
     void addAction(TAction* action, bool accessible = false);
     void showActions();
@@ -103,12 +107,6 @@ void TSheetEx::assignSheet(TTabSheet* sheet, bool accessible)
     this->accessible = accessible;
 }
 
-/**/
-/*void TSheetEx::assignMode(TSheetType packModeId)
-{
-    this->packModeId = packModeId;
-}
-  */
 /* Добавляет действие в список доступных дейсвия для листа*/
 void TSheetEx::addAction(TAction* action, bool accessible)
 {
@@ -123,8 +121,6 @@ void TSheetEx::showActions()
         (*action)->Visible = true;
     }
 }
-
-
 
 /* Класс для хранения элемента(раздела),
    представляющего режим работы программы */
@@ -165,7 +161,7 @@ void TModeItem::addAction(TAction* action)
     _actions.push_back(action);
 }
 
-
+/* Добавляет странцицу */
 TSheetEx* TModeItem::addSheet(TTabSheet* _sheet, bool _accessible)
 {
     sheets.push_back(TSheetEx(_sheet, _accessible));
@@ -182,6 +178,7 @@ void TModeItem::showSheets()
     }
 }
 
+/* Получает страницу по типу */
 TSheetEx* TModeItem::getSheetByType(TSheetType type)
 {
     for(std::vector<TSheetEx>::iterator sheet = sheets.begin(); sheet != sheets.end(); sheet++)
@@ -191,7 +188,7 @@ TSheetEx* TModeItem::getSheetByType(TSheetType type)
             return sheet;
         }
     }
-
+    return SHEET_TYPE_UNDEFINED;
 }
 
 /* Прячет все действия в Action листах */
@@ -241,14 +238,14 @@ void TModeItem::showSheet(TSheetEx* sheetEx)
     }
 }
 
-/**/
+/* Отображает страницу */
 void TModeItem::showSheet(TSheetType type)
 {
     TSheetEx* sheetEx = getSheetByType(type);
     showSheet(sheetEx);
 }
 
-
+/* Отображает страницу по индексу */
 void TModeItem::showSheet(int index)
 {
     // Тут доделать
@@ -264,74 +261,14 @@ typedef std::vector<TModeItem> TModeList;
 class TFieldActivityForm : public TForm
 {
 __published:	// IDE-managed Components
-    TGroupBox *GroupBox5;
-    TBitBtn *ResetFiltersButton;
-    TComboBox *PackIdFilterComboBox;
-    TComboBox *FioComboBox;
-    TComboBox *AddressComboBox;
-    TComboBox *AcctIdComboBox;
-    TLabel *Label3;
-    TLabel *Label4;
-    TLabel *Label5;
-    TLabel *Label13;
-    TGroupBox *GroupBox6;
-    TBitBtn *BitBtn1;
-    TComboBox *ComboBox5;
-    TLabel *Label19;
-    TComboBox *ServiceCompanyFilterComboBox;
-    TGroupBox *GroupBox7;
-    TLabel *Label2;
-    TEdit *ParamPackIdEdit;
-    TLabel *Label6;
-    TGroupBox *GroupBox1;
-    TLabel *Label18;
-    TLabel *Label17;
-    TLabel *Label16;
-    TLabel *Label15;
-    TLabel *Label14;
-    TLabel *Label8;
-    TLabel *Label9;
-    TLabel *Label10;
-    TLabel *Label11;
-    TLabel *Label12;
-    TDateTimePicker *DateTimePicker1;
-    TDateTimePicker *DateTimePicker2;
-    TCheckBox *CcDttmIsNullCheckBox;
-    TLabel *Label1;
-    TLabel *Label7;
-    TPopupMenu *SelectAcctPopupMenu;
-    TMenuItem *N1;
-    TMenuItem *N2;
-    TMenuItem *N3;
-    TMenuItem *N31;
-    TButton *Button6;
-    TPageControl *PackPageControl;
-    TTabSheet *DebtorsTabSheet;
-    TTabSheet *PackManualTabSheet;
-    TTabSheet *StopListTabSheet;
-    TBitBtn *ShowDocumentsMenuButton;
     TPopupMenu *DocumentsPopupMenu;
     TMenuItem *N4;
-    TCheckBox *CcDttmExistsCheckBox;
     TGroupBox *GroupBox3;
     TLabel *Label20;
-    TLabel *Label21;
-    TLabel *Label22;
-    TComboBox *CityComboBox;
-    TComboBox *OpAreaDescrFilterComboBox;
-    TLabel *Label23;
-    TBitBtn *BitBtn6;
     TMenuItem *N5;
-    TTabSheet *ApprovalListTabSheet;
-    TDBGridAlt *DBGridAltManual;
-    TDBGridAlt *DBGridAltGeneral;
-    TDBGridAlt *ApproveListGrid;
-    TCheckBox *ccDttmIsApprovedCheckBox;
     TMenuItem *DocumentStopMenuItem;
     TMenuItem *N7;
     TMenuItem *N8;
-    TDBGridAlt *StopListGrid;
-    TDBLookupComboBox *OtdelenComboBox;
     TActionList *ActionList1;
     TAction *printDocumentFaNoticesAction;
     TAction *printDocumentFaNoticesListAction;
@@ -340,37 +277,92 @@ __published:	// IDE-managed Components
     TAction *printDocumentStopListAction;
     TAction *createFaPackAction;
     TAction *approveFaPackCcDttmAction;
-    TBitBtn *ShowActionsMenuButton;
     TPopupMenu *ActionsPopupMenu;
     TMenuItem *MenuItem1;
     TMenuItem *MenuItem2;
-    TDBGrid *DBGrid1;
     TAction *checkAllAction;
     TAction *checkNoneAction;
     TAction *checkWithoutCcAction;
     TAction *checkWithCcLess3MonthAction;
-    TEditAlt *SaldoFilterEdit;
     TMenuItem *N6;
-    TTabSheet *PackStopTabSheet;
-    TTabSheet *PackRefuseStopTabSheet;
-    TTabSheet *TabSheet3;
-    TTabSheet *PackReloadTabSheet;
-    TComboBox *SelectModeComboBox;
     TAction *createFaPackStopAction;
     TMenuItem *N9;
-    TDBGridAlt *StopPackGrid;
-    TLabel *Label24;
-    TEdit *Edit1;
     TActionList *ActionList2;
     TAction *Action11;
     TAction *Action12;
     TAction *Action13;
     TAction *Action14;
+    TPanel *Panel1;
+    TGroupBox *GroupBox1;
+    TLabel *Label16;
+    TLabel *Label15;
+    TLabel *Label14;
+    TLabel *SelectedStatLabel;
+    TLabel *TotalStatLabel;
+    TLabel *FilteredStatLabel;
+    TGroupBox *GroupBox5;
+    TLabel *Label3;
+    TLabel *Label4;
+    TLabel *Label5;
+    TLabel *Label13;
+    TLabel *Label19;
+    TLabel *Label1;
+    TLabel *Label7;
+    TLabel *Label21;
+    TLabel *Label22;
+    TLabel *Label23;
+    TBitBtn *ResetFiltersButton;
+    TComboBox *PackIdFilterComboBox;
+    TComboBox *AddressComboBox;
+    TComboBox *ServiceCompanyFilterComboBox;
+    TDateTimePicker *DateTimePicker1;
+    TDateTimePicker *DateTimePicker2;
+    TCheckBox *CcDttmIsNullCheckBox;
+    TCheckBox *CcDttmExistsCheckBox;
+    TComboBox *CityComboBox;
+    TComboBox *OpAreaDescrFilterComboBox;
+    TCheckBox *ccDttmIsApprovedCheckBox;
+    TEditAlt *SaldoFilterEdit;
+    TEditAlt *AcctIdComboBox;
+    TEdit *FioComboBox;
+    TGroupBox *GroupBox7;
+    TLabel *Label2;
+    TLabel *Label6;
+    TEdit *ParamPackIdEdit;
+    TDBLookupComboBox *OtdelenComboBox;
+    TComboBox *SelectModeComboBox;
+    TPanel *Panel2;
+    TPanel *SelectAcctPopupMenuPanel;
     TBitBtn *ShowSelectAcctMenuButton;
     TCheckBox *SelectAllCheckBox;
-    TPanel *SelectAcctPopupMenuPanel;
+    TBitBtn *ShowActionsMenuButton;
+    TBitBtn *ShowDocumentsMenuButton;
+    TButton *Button6;
+    TPageControl *PackPageControl;
+    TTabSheet *DebtorsTabSheet;
+    TDBGridAlt *DBGridAltGeneral;
+    TTabSheet *PackManualTabSheet;
+    TDBGridAlt *DBGridAltManual;
+    TTabSheet *ApprovalListTabSheet;
+    TDBGridAlt *ApproveListGrid;
+    TTabSheet *StopListTabSheet;
+    TDBGridAlt *StopListGrid;
     TTabSheet *PackStopListTabSheet;
     TDBGridAlt *PackStopListGrid;
+    TTabSheet *PackStopTabSheet;
+    TDBGridAlt *StopPackGrid;
+    TTabSheet *PackRefuseStopTabSheet;
+    TTabSheet *TabSheet3;
+    TTabSheet *PackReloadTabSheet;
+    TPopupMenu *SelectAcctPopupMenu;
+    TMenuItem *N1;
+    TMenuItem *N2;
+    TMenuItem *N3;
+    TMenuItem *N31;
+    TTabSheet *PostListTabSheet;
+    TDBGridAlt *PostListGrid;
+    TAction *createFaPackPostAction;
+    TMenuItem *N10;
     void __fastcall FormShow(TObject *Sender);
     void __fastcall FilterControlChange(TObject *Sender);
     void __fastcall DBGridAltGeneralChangeCheck(TObject *Sender);
@@ -406,7 +398,6 @@ __published:	// IDE-managed Components
     void __fastcall checkAllActionExecute(TObject *Sender);
     void __fastcall ccDttmIsApprovedCheckBoxClick(TObject *Sender);
     void __fastcall DBGridAltManualCellClick(TColumn *Column);
-    void __fastcall ActionList1Update(TBasicAction *Action, bool &Handled);
     void __fastcall printDocumentStopActionExecute(TObject *Sender);
     void __fastcall SelectModeComboBoxChange(TObject *Sender);
     void __fastcall checkNoneActionExecute(TObject *Sender);
@@ -415,26 +406,25 @@ __published:	// IDE-managed Components
     void __fastcall PackRefuseStopTabSheetShow(TObject *Sender);
     void __fastcall SelectAllCheckBoxClick(TObject *Sender);
     void __fastcall PackStopListTabSheetShow(TObject *Sender);
+    void __fastcall checkAllActionUpdate(TObject *Sender);
+    void __fastcall createFaPackNoticeActionUpdate(TObject *Sender);
+    void __fastcall PostListTabSheetShow(TObject *Sender);
+    void __fastcall createFaPackPostActionExecute(TObject *Sender);
 private:	// User declarations
     //void __fastcall TFieldActivityForm::selectMode(int mode);
     void __fastcall OnQueryAfterExecute(TObject *Sender);
     void __fastcall setMode(int index);
-    //void __fastcall HideAllActions();   // Прячет все действия
     void __fastcall changeSheet(TSheetType type);
-
-    //typedef pair<String, int> TModeItem;    // Для хранения элемента списка
-    //typedef std::vector<TModeItem> TModeList;   // Для хранения списка
 
 
     TModeList _modeList;    // Список доступных режимов работы со списками (например: Работа с уведомления или Работа с заявками на ограничение)
-    //_TModeList
-
     TModeItem* _currentMode;
 
-    void __fastcall showDebtorList(const String& acctOtdelen);
+    void __fastcall showDebtorList();
+    void __fastcall showPostList();
     void __fastcall showFaPack(const String& faPackId);
-    void __fastcall showStopList(const String& acctOtdelen);
-    void __fastcall showApprovalList(const String& acctOtdelen);
+    void __fastcall showStopList();
+    void __fastcall showApprovalList();
 
 
     void __fastcall showFaList();
@@ -444,47 +434,40 @@ private:	// User declarations
 
     void __fastcall resetFilterControls();
 
-    //void __fastcall setCurOtdelen(const String& otdelen, bool resetPack = true);
     void __fastcall setCurPackMode();
-    //void __fastcall setCurPackId(const String& faPackId);
-    void __fastcall refreshControls();
+    void __fastcall refreshCheckedCount();
     void __fastcall showPopupSubMenu(TWinControl *control, TPopupMenu* menu);   // Отображает Popup-меню в позиции по отношению к позиции control
     void __fastcall refreshParametersControls();
     void __fastcall refreshFilterControls();
     void __fastcall refreshActionsStates();
 
 
-    //void __fastcall setFilter(const String& filterName, const String& filterValue);
     ColorList _colorList;
-
-
     TDBGridAlt* _currentDbGrid;
-
     TDataSetFilter* _currentFilter;
-    //TDataSetFilter _filterPackGeneral;   // Фильтр
-    //TDataSetFilter _filterPackManual;   // Фильтр
-    //TDataSetFilter _filterApproveList;   // Фильтр
 
-    //TSheetType _curPackMode;  // Текущий режим
-    //String _curPackId;      // Текущая пачка
-    //String _curOtdelen;     // Текущий участок
 
     bool _packPageControlChangedSelf;
-    /**/
-    //bool _packPageControlChangedSelf;
-
-
-
-
     void __fastcall OnThreadEnd(TObject *Sender);
     void __fastcall OnThreadBegin(TObject *Sender);
+    void __fastcall OnChangeFilter(TObject *Sender);
+
 
     TThreadDataSet* tds;
 
 
+    int _checkedCount;
+    int _recordCount;
+
+    //void __fastcall setCurPackId(const String& faPackId);
+    //void __fastcall setCurOtdelen(const String& otdelen, bool resetPack = true);
+    //void __fastcall setFilter(const String& filterName, const String& filterValue);
+    //bool _packPageControlChangedSelf;
+
 public:		// User declarations
     __fastcall TFieldActivityForm(TComponent* Owner);
 };
+
 //---------------------------------------------------------------------------
 extern PACKAGE TFieldActivityForm *FieldActivityForm;
 //---------------------------------------------------------------------------

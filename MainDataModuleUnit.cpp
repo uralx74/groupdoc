@@ -1,4 +1,24 @@
-//---------------------------------------------------------------------------
+/*
+  Основной управляющий модуль программы.
+
+  Примечание:
+  На текущий момент в данном модуле также хранится набор всех основных используемых
+  запросов. В дальнейшем необходимо перенести в отдельный модуль.
+
+  Использование.
+  1. Для выполнения запросов в фоновом режиме
+
+  Важно:
+  1. Запросы
+    getOtdelenListQuery
+    getFaPackInfo
+    являются стратегически важными. В них хранится текущее состояние модели.
+
+*/
+
+// Режим отладки
+#define DEBUG
+//#undef NDEBUG
 
 #include <vcl.h>
 #pragma hdrstop
@@ -163,8 +183,8 @@ String DualList::getValue(TComboBox* comboBox)
 /*
 */
 __fastcall TMainDataModule::TMainDataModule(TComponent* Owner)
-    : TDataModule(Owner),
-    _currentFaPackId("")
+    : TDataModule(Owner)
+    //_currentFaPackId("")
 {
     // Список для комбобокса
     //otdelenList.setSourceQuery(getOtdelenList);
@@ -194,6 +214,7 @@ void __fastcall TMainDataModule::DataModuleCreate(TObject *Sender)
     bool auth = loginForm->execute();
 
 
+
     userRole << TUserRole::UNDEFINED;
     if ( auth )
     {
@@ -215,13 +236,21 @@ void __fastcall TMainDataModule::DataModuleCreate(TObject *Sender)
         }
 
     }
+    else  // Выход если не произошло авторизации
+    {
+        delete loginForm;
+        Application->Terminate();
+        Application->ProcessMessages();
+        return;
+    }
 
     delete loginForm;
 
-    if ( userRole.Contains(TUserRole::UNDEFINED) )
+    if ( userRole.Contains(TUserRole::UNDEFINED) )   
     {   // Если роль не установлена то выходим из программы
         Application->Terminate();
         Application->ProcessMessages();
+        MessageBoxStop("Вы не имеете полномочий для работы в этой программе.\nПрограмма будет закрыта.");
         return;
     }
 
@@ -242,8 +271,18 @@ void __fastcall TMainDataModule::DataModuleCreate(TObject *Sender)
     getOtdelenListQuery->ParamByName("app_path")->AsString = appPath;
     getOtdelenListQuery->Open();
 
+    
+    if ( getOtdelenListQuery->RecordCount == 0 )
+    { // Если для пользователя нет доступных участков
+        Application->Terminate();
+        Application->ProcessMessages();
+        MessageBoxStop("Вы не имеете доступных участков.\nПрограмма будет закрыта.");
+        return;
+    }
+
+
     /* Задаем текущее отделение */
-    setAcctOtdelen(getOtdelenListQuery->FieldByName("ACCT_OTDELEN")->Value);
+    setAcctOtdelen(getOtdelenListQuery->FieldByName("ACCT_OTDELEN")->AsString);
 
 
     /* Создание фильтров */
@@ -251,10 +290,7 @@ void __fastcall TMainDataModule::DataModuleCreate(TObject *Sender)
     getCheckedFilter->add("checked", "check_data = :param"); // Отмеченные
     getCheckedFilter->add("group", "grp_data = :param"); // С группировкой (например, для формирования заявок на отключение
                                                     // сгруппированных по сетевым в отдельные файлы)
-
     //getCheckedFilter->setValue("checked", "", " ");
-
-
 
     /* Фильтр для списка должников */
     //DBGridAltGeneral->Filtered = true;
@@ -368,10 +404,14 @@ void __fastcall TMainDataModule::DataModuleCreate(TObject *Sender)
 
     // Настройки программы
     getConfigQuery->ParamByName("app_path")->AsString = appPath;
-    getConfigQuery->ParamByName("username")->AsString = EsaleSession->Username;    getConfigQuery->Open();
+    getConfigQuery->ParamByName("username")->AsString = EsaleSession->Username;
+    getConfigQuery->Open();
 
     // Список отделений и прочая общая информация
     getOtdelenListQuery->ParamByName("app_path")->AsString = appPath;
+
+    //getOtdelenListQuery->ParamByName("username")->AsString = EsaleSession->Username;
+
     getOtdelenListQuery->Open();
 
     getFaPackInfo->ParamByName("app_path")->AsString = appPath;
@@ -405,7 +445,7 @@ void __fastcall TMainDataModule::DataModuleCreate(TObject *Sender)
 
 
 
-
+    _acctOtdelen = getOtdelenListQuery->FieldByName("acct_otdelen");
 }
 
 /*
@@ -496,37 +536,26 @@ void TMainDataModule::setCcApprovalDttmSelected(bool cancelApproval)
 
 /* Создает несколько реестров
    используя группировку
+   Используется, например, для создания заявок на ограничение в разные сетевые компании
 */
-String __fastcall TMainDataModule::createPackMulti(TDataSetFilter* filter, TPackTypeCd::Type packTypeCd, const String& acctOtdelen)
+String __fastcall TMainDataModule::createPackMulti(TDataSetFilter* filter, TFaPackTypeCd faPackTypeCd, const String& acctOtdelen)
 {
     int grp = 1;
     getCheckedFilter->setValue("checked", "param", "1");
     getCheckedFilter->setValue("group", "param", IntToStr(grp++)); //
     while ( !getFaPackStopQuery->Eof )
     {
-        createPackNotice(filter, acctOtdelen);
+        createPackNotice(faPackTypeCd);
         //setPackCharDttm("ST-P-DT", getConfigQuery->FieldByName("sysdate")->Value)
         getCheckedFilter->setValue("group", "param", IntToStr(grp++)); //
     }
 }
 
+
+
 /* Создать реестр
 */
 String __fastcall TMainDataModule::createPackStop()
-{
-    return createPackStop(getStopListFilter, getAcctOtdelen());
-}
-
-String __fastcall TMainDataModule::createPackNotice()
-{
-    return createPackNotice(getDebtorsFilter,  getAcctOtdelen());
-}
-
-
-
-/* Создать реестр
-*/
-String __fastcall TMainDataModule::createPackStop(TDataSetFilter* filter, const String& acctOtdelen)
 {
     // Цикл по выделенным строкам
     // из каждой строки по очереди берутся параметры город, улица, контрлер
@@ -534,6 +563,7 @@ String __fastcall TMainDataModule::createPackStop(TDataSetFilter* filter, const 
     // Полученные данные выводятся в шаблон Excel,
     // затем действия повторяются для следующей строки из списка с параметрами
     //_currentDbGrid->DataSource->DataSet->DisableControls();
+    TDataSetFilter* filter = getStopListFilter;
     filter->LockDataSetPos();
 
     getCheckedFilter->setValue("checked", "param", "1");
@@ -544,8 +574,8 @@ String __fastcall TMainDataModule::createPackStop(TDataSetFilter* filter, const 
     if (!filter->DataSet->Eof)  // Если есть отмеченные записи
     {
         // Задаем параметры пакета
-        MainDataModule->AddFaPackProc->ParamByName("p_fa_pack_type_cd")->Value = TPackTypeCd::PACK_STOP;
-        MainDataModule->AddFaPackProc->ParamByName("p_acct_otdelen")->Value = acctOtdelen;
+        AddFaPackProc->ParamByName("p_fa_pack_type_cd")->Value = FPT_STOP;
+        AddFaPackProc->ParamByName("p_acct_otdelen")->Value = _acctOtdelen->Value;
 
         int grp_data_max = getCheckedFilter->DataSet->FieldByName("grp_data_max")->AsInteger;
         for (int i = 1; i <= grp_data_max; i++ )
@@ -556,7 +586,7 @@ String __fastcall TMainDataModule::createPackStop(TDataSetFilter* filter, const 
                 continue;
             }
             // Создаем новый пакет
-            MainDataModule->AddFaPackProc->ExecProc();
+            AddFaPackProc->ExecProc();
             String faPackId = MainDataModule->AddFaPackProc->ParamByName("result")->AsString;
 
             // Добавляем в новый пакет выделенные лицевые счета
@@ -582,9 +612,9 @@ String __fastcall TMainDataModule::createPackStop(TDataSetFilter* filter, const 
     }
 }
 
-/* Создать реестр
+/* Создать реестр уведомлений
 */
-String __fastcall TMainDataModule::createPackNotice(TDataSetFilter* filter, const String& acctOtdelen)
+String __fastcall TMainDataModule::createPackNotice(TFaPackTypeCd faPackTypeCd)
 {
     // Цикл по выделенным строкам
     // из каждой строки по очереди берутся параметры город, улица, контрлер
@@ -592,33 +622,38 @@ String __fastcall TMainDataModule::createPackNotice(TDataSetFilter* filter, cons
     // Полученные данные выводятся в шаблон Excel,
     // затем действия повторяются для следующей строки из списка с параметрами
     //_currentDbGrid->DataSource->DataSet->DisableControls();
-    filter->LockDataSetPos();
+
+    //TDataSetFilter* filter = getDebtorsFilter;
+
+    _currentFilter->LockDataSetPos();
 
     getCheckedFilter->setValue("checked", "param", "1");
-    String k = getCheckedFilter->getFilterString();
-    getCheckedFilter->DataSet = filter->DataSet;
+    //String k = getCheckedFilter->getFilterString();
+    getCheckedFilter->DataSet = _currentFilter->DataSet;
 
-    if (!filter->DataSet->Eof)  // Если есть отмеченные записи
+    if (!_currentFilter->DataSet->Eof)  // Если есть отмеченные записи
     {
         // Создаем новый пакет
-        MainDataModule->AddFaPackProc->ParamByName("p_fa_pack_type_cd")->Value = TPackTypeCd::PACK_MANUAL;
-        MainDataModule->AddFaPackProc->ParamByName("p_acct_otdelen")->Value = acctOtdelen;
-        MainDataModule->AddFaPackProc->ExecProc();
-        String faPackId = MainDataModule->AddFaPackProc->ParamByName("result")->AsString;
-
+        AddFaPackProc->ParamByName("p_fa_pack_type_cd")->Value = faPackTypeCd;
+        AddFaPackProc->ParamByName("p_acct_otdelen")->Value = _acctOtdelen->Value;
+        AddFaPackProc->ExecProc();
+        String faPackId = AddFaPackProc->ParamByName("result")->AsString;
 
         // Цикл
-        while ( !filter->DataSet->Eof )
+        while ( !_currentFilter->DataSet->Eof )
         {
-            AddFaProc->ParamByName("p_acct_id")->AsString = filter->DataSet->FieldByName("acct_id")->AsString;
+            AddFaProc->ParamByName("p_acct_id")->AsString = _currentFilter->DataSet->FieldByName("acct_id")->AsString;
             AddFaProc->ParamByName("p_fa_pack_id")->AsString = faPackId;
             AddFaProc->ExecProc();
-            filter->DataSet->Next();
+            _currentFilter->DataSet->Next();
+
+            // Здесь сделать вызов логирующей функции
+            Application->ProcessMessages();
         }
         MainDataModule->EsaleSession->Commit();
 
         getCheckedFilter->DataSet = NULL;
-        filter->UnlockDataSetPos();
+        _currentFilter->UnlockDataSetPos();
 
         return faPackId;
     }
@@ -626,61 +661,14 @@ String __fastcall TMainDataModule::createPackNotice(TDataSetFilter* filter, cons
     {
         return "";
     }
+}
 
-
-
-
-
-
-
-    /*for (int i = 1; !filter->DataSet->Eof; i++, _currentDbGrid->DataSource->DataSet->Next())
-    {
-        //if ( !_currentDbGrid->isChecked() ) // Если строка отмечена, то добавляем параметры
-        //{
-        //    continue;
-        //}
-
-        AddFaProc->ParamByName("p_acct_id")->AsString = _currentDbGrid->DataSource->DataSet->FieldByName("acct_id")->AsString;
-        AddFaProc->ParamByName("p_fa_pack_id")->AsString = faPackId;
-        AddFaProc->ExecProc();
-    } */
-
-
-
-
-
-
-    //_currentDbGrid->Filtered = false;
-    //_currentDbGrid->DataSource->DataSet->First();
-    //dataSet->First();
-
-    //filter->SetFilterExclusive("cheked");
-    //filter->setFilterParamValue(_currentFilter, "cc_dttm", "begin_cc_dttm", " ");
-
-    //getCheckedFilter->
-
-
-
-    // 2017-01-16
-    // Накладываем фильтр на дата сет + цикл
-
-/*    for (int i = 1; !_currentDbGrid->DataSource->DataSet->Eof; i++, _currentDbGrid->DataSource->DataSet->Next())
-    {
-        if ( !_currentDbGrid->isChecked() ) // Если строка отмечена, то добавляем параметры
-        {
-            continue;
-        }
-
-        MainDataModule->AddFaProc->ParamByName("p_acct_id")->AsString = _currentDbGrid->DataSource->DataSet->FieldByName("acct_id")->AsString;
-        MainDataModule->AddFaProc->ParamByName("p_fa_pack_id")->AsString = faPackId;
-        MainDataModule->AddFaProc->ExecProc();
-    }
-    _currentDbGrid->Filtered = true;
-
-    MainDataModule->EsaleSession->Commit();
-    _currentDbGrid->DataSource->DataSet->EnableControls();
-*/
-
+/**/
+void __fastcall TMainDataModule::closeDebtorsQuery()
+{
+    // Чтобы при открытии "Всех должников" после создания нового реестра произошло обновление
+    getDebtors->ParamByName("acct_otdelen")->Value = "";
+    getDebtorsRam->Close();
 }
 
 //void __fastcall TMainDataModule::setFilter(const String& filterName, const String& filterValue)
@@ -765,33 +753,33 @@ void __fastcall TMainDataModule::setCheckAll(TDataSet* dataSet, bool value)
 
 /* Отображает список на утверждение
    по выбранному участку */
-void __fastcall TMainDataModule::getApprovalList(const String& acctOtdelen)
+void __fastcall TMainDataModule::getApprovalList()
 {
-    if (getApprovalListQuery->ParamByName("acct_otdelen")->Value != acctOtdelen)
+    if (getApprovalListQuery->ParamByName("acct_otdelen")->Value != _acctOtdelen->Value)
     {
-        getApprovalListQuery->ParamByName("acct_otdelen")->Value = acctOtdelen;
+        getApprovalListQuery->ParamByName("acct_otdelen")->Value = _acctOtdelen->Value;
         openOrRefresh(getApprovalListQuery);
     }
 }
 
 /* Отображает список на введение ограничения
    по выбранному участку */
-void __fastcall TMainDataModule::getStopList(const String& acctOtdelen)
+void __fastcall TMainDataModule::getStopList()
 {
-    if (getStopListQuery->ParamByName("acct_otdelen")->Value != acctOtdelen)
+    if (getStopListQuery->ParamByName("acct_otdelen")->Value != _acctOtdelen->Value)
     {
-        getStopListQuery->ParamByName("acct_otdelen")->Value = acctOtdelen;
+        getStopListQuery->ParamByName("acct_otdelen")->Value = _acctOtdelen->Value;
         openOrRefresh(getStopListQuery);
     }
 }
 
 /* Отображает список реестров на ограничение
    по выбранному участку */
-void __fastcall TMainDataModule::getPackStopList(const String& acctOtdelen)
+void __fastcall TMainDataModule::getPackStopList()
 {
-    if (getPackStopListQuery->ParamByName("acct_otdelen")->Value != acctOtdelen)
+    if (getPackStopListQuery->ParamByName("acct_otdelen")->Value != _acctOtdelen->Value)
     {
-        getPackStopListQuery->ParamByName("acct_otdelen")->Value = acctOtdelen;
+        getPackStopListQuery->ParamByName("acct_otdelen")->Value = _acctOtdelen->Value;
         openOrRefresh(getPackStopListQuery);
     }
 }
@@ -799,21 +787,17 @@ void __fastcall TMainDataModule::getPackStopList(const String& acctOtdelen)
 
 /* Отображает список реестров
    по выбранному участку */
-void __fastcall TMainDataModule::getFaPackList(String acctOtdelen, String faPackTypeCd)
+void __fastcall TMainDataModule::getFaPackList(String faPackTypeCd)
 {
-    if (acctOtdelen == "")
-    {
-        acctOtdelen = _currentAcctOtdelen;
-    }
     /* Это условие возможно нужно убрать,
     так как не обрабатывается ситуация, если случилось создание нового реестра */
-    if (selectFaPackQuery->ParamByName("acct_otdelen")->Value != acctOtdelen ||
-      selectFaPackQuery->ParamByName("fa_pack_type_cd")->Value != faPackTypeCd)
-    {
-        selectFaPackQuery->ParamByName("acct_otdelen")->Value = acctOtdelen;
+//    if (selectFaPackQuery->ParamByName("acct_otdelen")->Value != _acctOtdelen->Value ||
+//      selectFaPackQuery->ParamByName("fa_pack_type_cd")->Value != faPackTypeCd)
+//    {
+        selectFaPackQuery->ParamByName("acct_otdelen")->Value = _acctOtdelen->Value;
         selectFaPackQuery->ParamByName("fa_pack_type_cd")->Value = faPackTypeCd;
         openOrRefresh(selectFaPackQuery);
-    }
+//    }
     selectFaPackQuery->First();
 }
 
@@ -843,25 +827,55 @@ void __fastcall TMainDataModule::OnShowDebtorsThreadEnd(TDataSet* ds)
 
 /* Отображает список должников
    по выбранному участку */
-void __fastcall TMainDataModule::getDebtorList(const String& acctOtdelen)
+void __fastcall TMainDataModule::getDebtorList()
 {
     if (_threadDataSet != NULL)
     {
         return;
     }
+
+    _currentFilter = getDebtorsFilter;
     //TThreadDataSet(false, MainDataModule->getDebtors, &OnShowDebtorsThreadEnd);
 
-    if (getDebtors->ParamByName("otdelen")->Value != acctOtdelen)
+    if (getDebtors->ParamByName("acct_otdelen")->Value != _acctOtdelen->Value)
     {
         if (_beforeOpenDataSet != NULL)
         {
             _beforeOpenDataSet(this);
         }
-        getDebtors->ParamByName("otdelen")->Value = acctOtdelen;
+        getDebtors->ParamByName("acct_otdelen")->Value = _acctOtdelen->Value;
         _threadDataSet = new TThreadDataSet(false, getDebtors, getDebtorsRam, &OnShowDebtorsThreadEnd);
 
         //openOrRefresh(MainDataModule->getDebtors);
     }
+}
+
+/* Отображает список на почту
+   по выбранному участку */
+void __fastcall TMainDataModule::getPostList()
+{
+    if (_threadDataSet != NULL)
+    {
+        return;
+    }
+
+    _currentFilter  = getPostListFilter;
+    //TThreadDataSet(false, MainDataModule->getDebtors, &OnShowDebtorsThreadEnd);
+
+    if (getPostListQuery->ParamByName("acct_otdelen")->Value != _acctOtdelen->Value)
+    {
+        getPostListQuery->ParamByName("acct_otdelen")->Value = _acctOtdelen->Value;
+        openOrRefresh(getPostListQuery);
+
+       /* if (_beforeOpenDataSet != NULL)
+        {
+            _beforeOpenDataSet(this);
+        }
+        _threadDataSet = new TThreadDataSet(false, getPostListQuery, getPostListRam, &OnShowDebtorsThreadEnd);
+        */
+        //openOrRefresh(MainDataModule->getDebtors);
+    }
+
 }
 
 /* Задает текущее отделение
@@ -869,17 +883,53 @@ void __fastcall TMainDataModule::getDebtorList(const String& acctOtdelen)
 */
 void __fastcall TMainDataModule::setAcctOtdelen(const String& acctOtdelen, bool updateOnly)
 {
-    if (_currentAcctOtdelen != acctOtdelen)
+    static String oldAcctOtdelen = "";
+    if (oldAcctOtdelen != acctOtdelen)
     {
-        _currentAcctOtdelen = acctOtdelen;
+        oldAcctOtdelen = acctOtdelen;
+
+        // Сделать открытие запроса getOtdelenListQuery с параметром acctOtdelen
+        // или переход на соответствующую запись
+        // в случае DBGridComboBox ничего не делать
 
         if (updateOnly == false)
         {
-            _currentFaPackId = "";
             getFaPackQuery->Close();
+            getFaPackInfo->Close();
+            getApprovalListQuery->Close();
+            getPackStopListQuery->Close();
+            getFaPackStopQuery->Close();
+            getStopListQuery->Close();
         }
     }
 }
+
+void __fastcall TMainDataModule::setFaPack(const String& faPackId)
+{
+    /* Запрос для хранения текущей информации по пакету */
+    static String oldFaPackId = "";
+
+    // Здесь возможно сделать проверку на наличие уже открытого запроса getFaPackInfo
+    //if (oldFaPackId )
+
+    getFaPackInfo->ParamByName("fa_pack_id")->AsString = faPackId;
+    openOrRefresh(getFaPackInfo);
+
+    setAcctOtdelen(getFaPackInfo->FieldByName("acct_otdelen")->AsString, true);
+}
+
+
+/* Задает текущее отделение по faPackId
+   updateOnly = true то меняется только значение _currentAcctOtdelen
+*/
+
+/*String __fastcall TMainDataModule::getAcctOtdelenByFaPackId(const String& faPackId)
+{
+    getFaPackInfo->ParamByName("fa_pack_id")->Value = faPackId;
+    openOrRefresh(getFaPackInfo);
+    return getFaPackInfo->FieldByName("acct_otdelen")->AsString;
+} */
+
 
 /* Задает текущий пакет
 */
@@ -888,70 +938,59 @@ void __fastcall TMainDataModule::setFaPackId_Notice(const String& faPackId)
 
 // здесь сделать или код открытия или использовать функцию
 //  getFaPack может быть переименовать в openFaPack.....
-
-    if (faPackId != "" && faPackId != getFaPackQuery->ParamByName("p_fa_pack_id")->AsString)
+    if (faPackId == "" ||
+        (getFaPackInfo->Active &&  faPackId == getFaPackInfo->FieldByName("fa_pack_id")->AsString))
     {
-        getFaPackQuery->ParamByName("p_fa_pack_id")->AsString = faPackId;
-        openOrRefresh(MainDataModule->getFaPackQuery);
-
-        setAcctOtdelen(getFaPackQuery->FieldByName("acct_otdelen")->AsString, true);
-
-
-        _currentFaPackTypeCd = getFaPackQuery->FieldByName("fa_pack_type_cd")->Value;
-        _currentFaPackId = faPackId;
+        return;
     }
 
-    // Здесь возможно закрывать запрос
-    // НО! getFaPackQuery - это запрос для грида, поэтому нужно предусмотреть специальный запрос
-    // для получения информации о FaPack
-    //getFaPackQuery->Close();
+    _currentFilter  = getFaPackFilter;
 
+    /* Запрос для списка*/
+    getFaPackQuery->ParamByName("fa_pack_id")->AsString = faPackId;
+    openOrRefresh(MainDataModule->getFaPackQuery);
+
+    /* Запрос для хранения текущей информации по пакету */
+    setFaPack(faPackId);
 }
 
 /* Задает текущий пакет
 */
 void __fastcall TMainDataModule::setFaPackId_Stop(const String& faPackId)
 {
-
-    // здесь сделать или код открытия или использовать функцию
-    //  getFaPack может быть переименовать в openFaPack.....
-    //if (getFaPackQuery->ParamByName("p_fa_pack_id")->Value != faPackId)
-    if (faPackId != NULL && faPackId != getFaPackStopQuery->ParamByName("fa_pack_id")->AsString )
+    if (faPackId == "" ||
+        (getFaPackInfo->Active &&  faPackId == getFaPackInfo->FieldByName("fa_pack_id")->AsString))
     {
-        getFaPackStopQuery->ParamByName("fa_pack_id")->AsString = faPackId;
-        openOrRefresh(MainDataModule->getFaPackStopQuery);
-
-        //getFaPack(faPackId);
-        setAcctOtdelen(getFaPackStopQuery->FieldByName("acct_otdelen")->AsString, true);
-        _currentFaPackTypeCd = getFaPackStopQuery->FieldByName("fa_pack_type_cd")->Value;
-        _currentFaPackId = faPackId;
+        return;
     }
 
-    // Здесь возможно закрывать запрос
-    // НО! getFaPackQuery - это запрос для грида, поэтому нужно предусмотреть специальный запрос
-    // для получения информации о FaPack
-    //getFaPackQuery->Close();
+    _currentFilter  = getPackStopListFilter;
 
+    /* Запрос для списка*/
+    getFaPackStopQuery->ParamByName("fa_pack_id")->AsString = faPackId;
+    openOrRefresh(getFaPackStopQuery);
+
+    /* Запрос для хранения текущей информации по пакету */
+    setFaPack(faPackId);
 }
 
 /*
 */
 String __fastcall TMainDataModule::getAcctOtdelen()
 {
-    return _currentAcctOtdelen;
+    return getOtdelenListQuery->FieldByName("acct_otdelen")->AsString;
+    //return _currentAcctOtdelen;
 }
 
 /**/
 String __fastcall TMainDataModule::getFaPackId_Notice()
 {
-    //return _currentFaPackId;
     return getFaPackQuery->FieldByName("fa_pack_id")->AsString;
 }
 
 /**/
 String __fastcall TMainDataModule::getFaPackId_Stop()
 {
-    //return _currentFaPackId;
     return getFaPackStopQuery->FieldByName("fa_pack_id")->AsString;
 }
 
@@ -963,6 +1002,36 @@ void __fastcall TMainDataModule::setOpenDataSetEvents(TNotifyEvent beforeOpenDat
     _beforeOpenDataSet = beforeOpenDataSet;
     _afterOpenDataSet = afterOpenDataSet;
 }
+
+/* Событие при изменение фильтра
+   Служат для синхронизации с графическим интерфейсом
+*/
+void __fastcall TMainDataModule::setOnChangeFilterMethod(TNotifyEvent onChangeFilterMethod)
+{
+    _onChangeFilterMethod = onChangeFilterMethod;
+}
+
+/* При изменении фильтра
+   Служит для синхронизации с графическим интерфейсом
+*/
+void __fastcall TMainDataModule::OnFilterChange(
+      TDataSetFilter *Sender, AnsiString filterName)
+{
+    if (_onChangeFilterMethod != NULL)
+    {
+        _onChangeFilterMethod(this);
+    }
+}
+//---------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
 
 
 

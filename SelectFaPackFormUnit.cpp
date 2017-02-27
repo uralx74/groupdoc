@@ -37,7 +37,6 @@ void __fastcall TSelectFaPackForm::FormCreate(TObject *Sender)
     //MainDataModule->otdelenList.assignTo(ComboBox1);
 
 
-
     /*MainDataModule->selectFaPackFilter->add(CityComboBox->Name, "city like '%:param%'");
     MainDataModule->selectFaPackFilter->add(FioComboBox->Name, "fio like '%:param%'");
     MainDataModule->selectFaPackFilter->add(PackIdFilterComboBox->Name, "fa_pack_id like '%:param%'");
@@ -75,7 +74,7 @@ bool __fastcall TSelectFaPackForm::execute(String acctOtdelen, String faPackType
 {
     //OtdelenComboBox2->KeyValue = MainDataModule->getAcctOtdelen();
     OtdelenComboBox2->KeyValue = acctOtdelen;
-    MainDataModule->getFaPackList(acctOtdelen, faPackTypeCd);
+    MainDataModule->getFaPackList( faPackTypeCd);
 
     //_faPack.clear();
     return this->ShowModal() == mrOk;

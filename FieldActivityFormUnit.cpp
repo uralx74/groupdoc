@@ -24,6 +24,7 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
 
     // Задаем функции для связи модуля данных с графическим интерфейсом
     MainDataModule->setOpenDataSetEvents(OnThreadBegin, OnThreadEnd);
+    MainDataModule->setOnChangeFilterMethod(OnChangeFilter);
 
     // Окно ожидания выполнения запроса
     WaitForm = new TWaitForm(this);
@@ -44,24 +45,30 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
     /* Формирование списков доступа к вкладкам */
 
     // Список должников
-    TUserRole::TRoleTypes AccessDebtorsTabSheet;
-    AccessDebtorsTabSheet<<TUserRole::OPERATOR;
-    AccessDebtorsTabSheet<<TUserRole::ADMINISTRATOR;
+    TUserRole::TRoleTypes Access_DebtorsTabSheet;
+    Access_DebtorsTabSheet<<TUserRole::OPERATOR;
+    Access_DebtorsTabSheet<<TUserRole::ADMINISTRATOR;
 
     // Реестр уведомлений
-    TUserRole::TRoleTypes AccessPackManualTabSheet;
-   AccessPackManualTabSheet<<TUserRole::OPERATOR;
-    AccessPackManualTabSheet<<TUserRole::ADMINISTRATOR;
+    TUserRole::TRoleTypes Access_PackManualTabSheet;
+    Access_PackManualTabSheet<<TUserRole::OPERATOR;
+    Access_PackManualTabSheet<<TUserRole::ADMINISTRATOR;
+
+    // Список на утверждение
+    TUserRole::TRoleTypes Access_ApprovalListTabSheet;
+    Access_ApprovalListTabSheet<<TUserRole::APPROVER;
+    Access_ApprovalListTabSheet<<TUserRole::ADMINISTRATOR;
+
+    // Список на почту
+    TUserRole::TRoleTypes Access_PostListTabSheet;
+    Access_PostListTabSheet<<TUserRole::OPERATOR;
+    Access_PostListTabSheet<<TUserRole::ADMINISTRATOR;
+
 
     // Список на ограничение
     TUserRole::TRoleTypes AccessStopListTabSheet;
     AccessStopListTabSheet<<TUserRole::OPERATOR;
     AccessStopListTabSheet<<TUserRole::ADMINISTRATOR;
-
-    // Список на утверждение
-    TUserRole::TRoleTypes AccessApprovalListTabSheet;
-    AccessApprovalListTabSheet<<TUserRole::APPROVER;
-    AccessApprovalListTabSheet<<TUserRole::ADMINISTRATOR;
 
     // Список реестров на ограничение
     TUserRole::TRoleTypes AccessPackStopListTabSheet;
@@ -90,6 +97,7 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
 
 
     TSheetEx* sheetTemp;
+
     /* Присоединяем вкладки к списку режимов работы */
     TModeItem item;
     item.caption = "Уведомления контролеру";
@@ -117,7 +125,7 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
 
     // Вкладка списка должников
     sheetTemp = item.addSheet(DebtorsTabSheet);
-    sheetTemp->accessible = !(AccessDebtorsTabSheet * MainDataModule->userRole).Empty();
+    sheetTemp->accessible = !(Access_DebtorsTabSheet * MainDataModule->userRole).Empty();
     sheetTemp->packModeId = SHEET_TYPE_DEBTORS;
     sheetTemp->addAction(createFaPackAction);
     sheetTemp->addAction(checkAllAction);
@@ -127,7 +135,7 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
 
     // Вкладка реестра должников
     sheetTemp = item.addSheet(PackManualTabSheet);
-    sheetTemp->accessible = !(AccessPackManualTabSheet * MainDataModule->userRole).Empty();
+    sheetTemp->accessible = !(Access_PackManualTabSheet * MainDataModule->userRole).Empty();
     sheetTemp->packModeId = SHEET_TYPE_NOTICES_PACK;
     sheetTemp->addAction(printDocumentFaNoticesAction);
     sheetTemp->addAction(printDocumentFaNoticesListAction);
@@ -138,7 +146,7 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
 
     // Вкладка утверждения вручения уведомления
     sheetTemp = item.addSheet(ApprovalListTabSheet);
-    sheetTemp->accessible = !(AccessApprovalListTabSheet * MainDataModule->userRole).Empty();
+    sheetTemp->accessible = !(Access_ApprovalListTabSheet * MainDataModule->userRole).Empty();
     sheetTemp->packModeId = SHEET_TYPE_APPROVE;
     sheetTemp->addAction(checkAllAction);
     sheetTemp->addAction(checkNoneAction);
@@ -146,11 +154,23 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
     sheetTemp->addAction(checkWithCcLess3MonthAction);
     sheetTemp->addAction(approveFaPackCcDttmAction);
 
+    // Вкладка списка уведомлений на почту
+    sheetTemp = item.addSheet(PostListTabSheet);
+    sheetTemp->accessible = !(Access_PostListTabSheet * MainDataModule->userRole).Empty();
+    sheetTemp->packModeId = SHEET_TYPE_POST_LIST;
+    sheetTemp->addAction(createFaPackAction);
+    sheetTemp->addAction(createFaPackPostAction);
+    sheetTemp->addAction(checkAllAction);
+    sheetTemp->addAction(checkNoneAction);
+    sheetTemp->addAction(checkWithoutCcAction);
+    sheetTemp->addAction(checkWithCcLess3MonthAction);
+
     //item.sheets.push_back( TSheetEx(DebtorsTabSheet, !(AccessDebtorsTabSheet * MainDataModule->userRole).Empty()) );
     //item.sheets.push_back( TSheetEx(PackManualTabSheet, !(AccessPackManualTabSheet * MainDataModule->userRole).Empty()) );
     //item.sheets.push_back( TSheetEx(ApprovalListTabSheet, !(AccessApprovalListTabSheet * MainDataModule->userRole).Empty()) );
 
-    TSheetEx sheet(DebtorsTabSheet, !(AccessDebtorsTabSheet * MainDataModule->userRole).Empty());
+    // Закомментировано 2017-02-22
+    //TSheetEx sheet(DebtorsTabSheet, !(Access_DebtorsTabSheet * MainDataModule->userRole).Empty());
 
 
 
@@ -242,14 +262,16 @@ __fastcall TFieldActivityForm::TFieldActivityForm(TComponent* Owner)
     }
     SelectModeComboBox->ItemIndex = 0;
 
-    setMode(0);     // Активируем первый доступный режим работы
+    refreshParametersControls();
 
+    setMode(0);     // Активируем первый доступный режим работы
 }
 
 /* Выполняется при завешении процедуры получения данных */
 void __fastcall TFieldActivityForm::OnThreadEnd(TObject *Sender)
 {
-    WaitForm->Close();
+    WaitForm->StopWait();
+    refreshCheckedCount();
 }
 
 /* Выполняется в начале процедуры получения данных */
@@ -268,19 +290,20 @@ void __fastcall TFieldActivityForm::FormShow(TObject *Sender)
 /* Отображает список должников
    Возможно следует удалить эту функцию
 */
-void __fastcall TFieldActivityForm::showDebtorList(const String& acctOtdelen)
+void __fastcall TFieldActivityForm::showDebtorList()
 {
-    MainDataModule->getDebtorList(acctOtdelen);
-    //MainDataModule->setAcctOtdelen(acctOtdelen);
-
+    MainDataModule->getDebtorList();
     _currentMode->showSheet(SHEET_TYPE_DEBTORS);
-
-    //setCurOtdelen(acctOtdelen);
-
-    refreshParametersControls();
-
     setCurPackMode();
 }
+
+void __fastcall TFieldActivityForm::showPostList()
+{
+    MainDataModule->getPostList();
+    _currentMode->showSheet(SHEET_TYPE_POST_LIST);
+    setCurPackMode();
+}
+
 
 /* Меняем отображаемую страницу */
 void __fastcall TFieldActivityForm::changeSheet(TSheetType type)
@@ -319,6 +342,7 @@ void __fastcall TFieldActivityForm::showFaPack(const String& faPackId)
     }
     }
 
+    refreshParametersControls();
 
     //_currentMode->showSheet(1);
     setCurPackMode();
@@ -348,9 +372,9 @@ void __fastcall TFieldActivityForm::showFaPack(const String& faPackId)
 }
 
 /* Отобразить список абонентов-кандидатов на ограничение*/
-void __fastcall TFieldActivityForm::showStopList(const String& acctOtdelen)
+void __fastcall TFieldActivityForm::showStopList()
 {
-    MainDataModule->getStopList(acctOtdelen);
+    MainDataModule->getStopList();
     _currentMode->showSheet(SHEET_TYPE_STOP);
 
     //
@@ -361,7 +385,7 @@ void __fastcall TFieldActivityForm::showStopList(const String& acctOtdelen)
 /* Отобразить список реестров на ограничение */
 void __fastcall TFieldActivityForm::showPackStopList(/*const String& acctOtdelen*/)
 {
-    MainDataModule->getPackStopList(MainDataModule->getAcctOtdelen());
+    MainDataModule->getPackStopList();
     _currentMode->showSheet(SHEET_TYPE_PACK_STOP_LIST);
 
     setCurPackMode();
@@ -380,9 +404,9 @@ void __fastcall TFieldActivityForm::showFaList()
 
 /*
 */
-void __fastcall TFieldActivityForm::showApprovalList(const String& acctOtdelen)
+void __fastcall TFieldActivityForm::showApprovalList()
 {
-    MainDataModule->getApprovalList(acctOtdelen);
+    MainDataModule->getApprovalList();
     _currentMode->showSheet(SHEET_TYPE_APPROVE);
     setCurPackMode();
 }
@@ -416,222 +440,81 @@ void __fastcall TFieldActivityForm::showFaInspectorList()
 */
 void __fastcall TFieldActivityForm::setCurPackMode()
 {
-    //_curPackMode = packMode;
-    /*if (_curPackMode != packMode)
-    {
-        _curPackMode = packMode;
-    }
-    else
-    {
-        return;
-    } */
-
-    //refreshControls();
-
-    //bool checkedItems = _currentDbGrid->recordCountChecked > 0;
-    //bool countItems = _currentDbGrid->recordCount > 0;
-
-    //Image3->Visible = _curPackMode == PACK_BLOCK;
-    //Image2->Visible = Image3->Visible || _curPackMode == PACK_POST;
-    //Image1->Visible = Image2->Visible || _curPackMode == PACK_MANUAL;
-
-    //BitBtn1->Visible = checkedItems;
-    //GroupBox6->Enabled = checkedItems;
-    //switchEnabledGroupBox(GroupBox6);
-    //BitBtn2->Visible = _curPackMode == PACK_MANUAL && checkedItems;
-    //BitBtn3->Visible = _curPackMode == PACK_POST && checkedItems;
-
-/*    bool bPackGeneral = _curPackMode == PACK_GENERAL;
-    bool bPackManual = _curPackMode == PACK_MANUAL;
-    bool bPackStop = _curPackMode == PACK_STOP;
-    bool bPackApprove = _curPackMode == PACK_APPROVE_LIST;
-*/
-
-/*    printDocumentFaNoticesAction->Enabled = bPackManual;
-    printDocumentFaNoticesListAction->Enabled = bPackManual;
-    printDocumentStopAction->Enabled = bPackStop;
-    printDocumentStopListAction->Enabled = bPackStop;
-    printDocumentStopActionRefuseAction->Enabled = bPackStop;
-*/
- /*   approveFaPackCcDttmAction->Enabled = bPackApprove;
-    createFaPackAction->Enabled = bPackGeneral;
-*/
-
-/*    SHEET_TYPE_UNDEFINED = 0,
-    SHEET_TYPE_DEBTORS,         // general
-    SHEET_TYPE_NOTICES_PACK,    //PACK_MANUAL,
-    SHEET_TYPE_APPROVE,//,
-
-    SHEET_TYPE_STOP,
-    SHEET_TYPE_STOP_PACK,
-    SHEET_TYPE_STOP_REFUSE_PACK,
-    SHEET_TYPE_RELOAD
-*/
-    //TActionList
-
-
-    /*for (int i = 0; i < ActionList1->ActionCount; i++)
-    {
-        ActionList1->Actions[i]->Visible = false;
-    } */
-
     switch(_currentMode->currentSheet->packModeId)
-//    switch(_curPackMode)
     {
-    //case PACK_GENERAL:
     case SHEET_TYPE_DEBTORS:
-        {
-            ParamPackIdEdit->Text = "";
-            ComboBox5->ItemIndex = 0;
+    {
+        ParamPackIdEdit->Text = "";
 
-            /*if (!DebtorsTabSheet->Visible)
-            {
-                DebtorsTabSheet->Show();
-            }*/
+        _currentFilter = MainDataModule->getDebtorsFilter;//&_filterPackGeneral;
+        _currentDbGrid = DBGridAltGeneral;
 
-            _currentFilter = MainDataModule->getDebtorsFilter;//&_filterPackGeneral;
-            _currentDbGrid = DBGridAltGeneral;
+        ccDttmIsApprovedCheckBox->Visible = false;
 
-            ccDttmIsApprovedCheckBox->Visible = false;
-
-            break;
-        }
+        break;
+    }
     case SHEET_TYPE_NOTICES_PACK:
-        {
-            ParamPackIdEdit->Text = MainDataModule->getFaPackId_Notice();//_curPackId;
+    {
+        ParamPackIdEdit->Text = MainDataModule->getFaPackId_Notice();//_curPackId;
 
-            /*if (!PackManualTabSheet->Visible)
-            {
-                PackManualTabSheet->Show();
-            } */
-            //PageControl1->ActivePageIndex = PackManualTabSheet->TabIndex;
-            //_currentFilter = &_filterPackManual;
+        _currentFilter = MainDataModule->getFaPackFilter;
+        _currentDbGrid = DBGridAltManual;
 
-            _currentFilter = MainDataModule->getFaPackFilter;
-            _currentDbGrid = DBGridAltManual;
+        ccDttmIsApprovedCheckBox->Visible = false;
 
-            ccDttmIsApprovedCheckBox->Visible = false;
+        break;
+    }
+    case SHEET_TYPE_APPROVE:
+    {
+        ParamPackIdEdit->Text = "";
 
-            break;
-        }
-     case SHEET_TYPE_APPROVE:
-        {
-            ParamPackIdEdit->Text = "";
+        _currentFilter = MainDataModule->getApprovalListFilter;
+        _currentDbGrid = ApproveListGrid;
 
-            /*if ( !ApprovalListTabSheet->Visible )
-            {
-                ApprovalListTabSheet->Show();
-            } */
-            _currentFilter = MainDataModule->getApprovalListFilter;
-            _currentDbGrid = ApproveListGrid;
+        ccDttmIsApprovedCheckBox->Visible = true;
+        break;
+    }
+    case SHEET_TYPE_POST_LIST:
+    {                        // Список на почту
+        ParamPackIdEdit->Text = "";
 
-            ccDttmIsApprovedCheckBox->Visible = true;
-            break;
-        }
+        _currentFilter = MainDataModule->getPostListFilter;
+        _currentDbGrid = PostListGrid;
 
+        break;
+    }
     case SHEET_TYPE_STOP:
-        {
-            ParamPackIdEdit->Text = ""; //_curPackId;
-            /*if ( !StopListTabSheet->Visible )
-            {
-                StopListTabSheet->Show();
-            }*/
-            //ParamPackIdEdit->Text = _curPackId;
+    {
+        ParamPackIdEdit->Text = "";
 
-            _currentFilter = MainDataModule->getStopListFilter;
-            _currentDbGrid = StopListGrid;
+        _currentFilter = MainDataModule->getStopListFilter;
+        _currentDbGrid = StopListGrid;
 
-            ccDttmIsApprovedCheckBox->Visible = false;
-            break;
-        }
+        //ccDttmIsApprovedCheckBox->Visible = false;
+        break;
+    }
     case SHEET_TYPE_STOP_PACK:
-        {
-            ParamPackIdEdit->Text = MainDataModule->getFaPackId_Stop();//_curPackId;
-            /*if ( !StopListTabSheet->Visible )
-            {
-                StopListTabSheet->Show();
-            }*/
-            //ParamPackIdEdit->Text = _curPackId;
+    {
+        ParamPackIdEdit->Text = MainDataModule->getFaPackId_Stop();
 
-            _currentFilter = MainDataModule->getFaPackStopFilter;
-            _currentDbGrid = StopPackGrid;
+        _currentFilter = MainDataModule->getFaPackStopFilter;
+        _currentDbGrid = StopPackGrid;
 
-            ccDttmIsApprovedCheckBox->Visible = false;
-            break;
-        }
+        //ccDttmIsApprovedCheckBox->Visible = false;
+        break;
+    }
     case SHEET_TYPE_PACK_STOP_LIST:
-        {
-            ParamPackIdEdit->Text = "";
+    {
+        ParamPackIdEdit->Text = "";
 
-            _currentFilter = MainDataModule->getPackStopListFilter;
-            _currentDbGrid = PackStopListGrid;
-            break;
-        }
+        _currentFilter = MainDataModule->getPackStopListFilter;
+        _currentDbGrid = PackStopListGrid;
+        break;
+    }
     }
 
-    refreshFilterControls();
-}
-
-
-/* 
-*/
-void __fastcall TFieldActivityForm::refreshControls()
-{
-    if ( _currentDbGrid != NULL )
-    {
-        bool checkedItems = _currentDbGrid->recordCountChecked > 0;
-        bool countItems = _currentDbGrid->recordCount > 0;
-
-        //Image3->Visible = _curPackMode == PACK_BLOCK;
-        //Image2->Visible = Image3->Visible || _curPackMode == PACK_POST;
-        //Image1->Visible = Image2->Visible || _curPackMode == PACK_MANUAL;
-        //BitBtn1->Visible = checkedItems;
-        //GroupBox6->Enabled = checkedItems;
-        switchEnabledGroupBox(GroupBox6);
-    }
-
-    //BitBtn2->Visible = _curPackMode == PACK_MANUAL && checkedItems;
-    //BitBtn3->Visible = _curPackMode == PACK_POST && checkedItems;
-
-/*    switch(_curPackMode)
-    {
-    case PACK_GENERAL:
-        {
-            ParamPackIdEdit->Text = "";
-            ComboBox5->ItemIndex = 0;
-            ModeDebtorsButton->Down = true;
-            PageControl1->ActivePageIndex = DebtorsTabSheet->TabIndex;
-            break;
-        }
-    case PACK_MANUAL:
-        {
-            ParamPackIdEdit->Text = _curPackId;
-            ComboBox5->ItemIndex = 1;
-            ModePackManualButton->Down = true;
-            PageControl1->ActivePageIndex = PackManualTabSheet->TabIndex;
-            break;
-        }
-    case PACK_POST:
-        {
-            ParamPackIdEdit->Text = _curPackId;
-            ComboBox5->ItemIndex = 2;
-            ModePackPostButton->Down = true;
-            PageControl1->ActivePageIndex = PackPostTabSheet->TabIndex;
-            break;
-        }
-    case PACK_BLOCK:
-        {
-            ParamPackIdEdit->Text = _curPackId;
-            ModePackBlockButton->Down = true;
-            break;
-        }
-
-    case PACK_MANUAL_POST:
-        {
-            ParamPackIdEdit->Text = _curPackId;
-            break;
-        }
-    }  */
+    refreshFilterControls();    // Обновляем состояние элементов управления для фильтров
+    refreshCheckedCount();  //
 }
 
 /*
@@ -681,8 +564,6 @@ void __fastcall TFieldActivityForm::FilterCcDttmChange(TObject *Sender)
     String resultCcDttm = tasktools::MergeStr(ccDttmIs, ccDttm, " OR ");
     MainDataModule->setFilterParamValue(_currentFilter, "cc_dttm", "param", resultCcDttm);
 
-    //String s = _currentFilter->getFilterString();
-
 
     //Variant d = DateTimePicker1->Date;
     // Сохраняем значения элементов управления
@@ -703,8 +584,6 @@ void __fastcall TFieldActivityForm::ccDttmIsApprovedCheckBoxClick(
     //
     TCheckBox* checkBox = static_cast<TCheckBox*>(Sender);
     MainDataModule->setFilterParamValue(_currentFilter, checkBox->Name, "param", checkBox->Checked? " " : "");
-//    String sss = _currentFilter->getFilterString();
-
 }
 
 
@@ -735,25 +614,67 @@ void __fastcall TZadanie_Form::FillTotalBar()
 //
 void __fastcall TFieldActivityForm::DBGridAltGeneralChangeCheck(TObject *Sender)
 {
-//
-/*    Label8->Caption = IntToStr(DBGridAlt1->recordCountChecked)  + "/" +IntToStr(DBGridAlt1->recordCount);
-    Label9->Caption = FloatToStr(DBGridAlt1->getSum("saldo", false, false));
-    Label10->Caption = FloatToStr(DBGridAlt1->getSum("saldo", false, true));
-    Label11->Caption = FloatToStr(DBGridAlt1->getSum("saldo", true, false));
-    Label12->Caption = FloatToStr(DBGridAlt1->getSum("saldo", true, true));
-*/
-
     //int checkedCount = _currentDbGrid->getSum("", "CHECK_DATA = 1", false).first;
-    
+    refreshCheckedCount();
+}
 
-    refreshControls();
+/* Обновляет статистику по выделенным элементам в dbgrid */
+void __fastcall TFieldActivityForm::refreshCheckedCount()
+{
+    if ( _currentDbGrid != NULL )
+    {
+        TSumResult checkedResult = _currentDbGrid->getSum("", "CHECK_DATA = 1", false);
+        TSumResult recordResult = _currentDbGrid->getSum("", "", false);
+        TSumResult recordFilteredResult = _currentDbGrid->getSum("", "", true);
+
+        _checkedCount = checkedResult.first;
+        _recordCount = recordResult.first;
+
+        SelectedStatLabel->Caption = IntToStr(checkedResult.first);
+        FilteredStatLabel->Caption = IntToStr(recordFilteredResult.first);
+        TotalStatLabel->Caption = IntToStr(recordResult.first);
+
+
+        // Состояние CheckBox для выделения записей
+        TNotifyEvent old_OnClick = SelectAllCheckBox->OnClick;
+        SelectAllCheckBox->OnClick = NULL;
+        if (_recordCount > 0)
+        {
+            if (_checkedCount == _recordCount)
+            {
+                SelectAllCheckBox->State = cbChecked;
+            }
+            else if (_checkedCount > 0)
+            {
+                SelectAllCheckBox->State = cbGrayed;
+            }
+            else
+            {
+                SelectAllCheckBox->State = cbUnchecked;
+            }
+        }
+        else
+        {
+            SelectAllCheckBox->State = cbUnchecked;
+        }
+        SelectAllCheckBox->OnClick = old_OnClick;
+
+
+        /*Label8->Caption = IntToStr(checkedResult.first)  + "/" +IntToStr(recordResult.first);
+        /*Label9->Caption = FloatToStr(DBGridAlt1->getSum("saldo", false, false));
+        Label10->Caption = FloatToStr(DBGridAlt1->getSum("saldo", false, true));
+        Label11->Caption = FloatToStr(DBGridAlt1->getSum("saldo", true, false));
+        Label12->Caption = FloatToStr(DBGridAlt1->getSum("saldo", true, true));
+        */
+    }
 }
 
 /*
 */
 void __fastcall TFieldActivityForm::DBGridAltGeneralChangeFilter(TObject *Sender)
 {
-    DBGridAltGeneralChangeCheck(Sender);
+    //DBGridAltGeneralChangeCheck(Sender);
+    refreshCheckedCount();
 }
 
 /* Отображает форму для выбора реестра
@@ -781,18 +702,11 @@ void __fastcall TFieldActivityForm::ParamPackIdEditClick(TObject *Sender)
         //setCurPackId( SelectFaPackForm->getFaPackId() );
         //setCurPackMode( SelectFaPackForm->getFaPackTypeId() );
         showFaPack( SelectFaPackForm->getFaPackId() );
-        refreshParametersControls();
+        //refreshParametersControls();
     }
 
     //refreshControls();
 }
-
-
-/* тестовая функция */
-//void __fastcall TFieldActivityForm::OnShowDebtorsThreadEnd(TDataSet* ds)
-//{
-//    MainDataModule->CopyDataSet(ds, MainDataModule->getDebtorsRam);
-//}
 
 /* Прячет все действия в Action листах */
 /*void __fastcall TFieldActivityForm::HideAllActions()
@@ -807,11 +721,8 @@ void __fastcall TFieldActivityForm::ParamPackIdEditClick(TObject *Sender)
 */
 void __fastcall TFieldActivityForm::Button6Click(TObject *Sender)
 {
+    refreshCheckedCount();
     //Application->CreateForm(__classid(TWaitForm), &WaitForm);
-    // Form_Wait->Label3->Caption = "Выполнение запроса...";
-//    WaitForm->Execute();
-    //TThreadDataSet* tds =
-//    TThreadDataSet(false, MainDataModule->getDebtors, &OnShowDebtorsThreadEnd);
 }
 
 /*
@@ -828,8 +739,8 @@ void __fastcall TFieldActivityForm::ParamPackIdEditKeyPress(
 */
 void __fastcall TFieldActivityForm::showPopupSubMenu(TWinControl *control, TPopupMenu* menu)
 {
-    TPoint p = ClientToScreen(TPoint(control->Left, control->Top + control->Height));
-    menu->Popup(p.x, p.y);
+    TPoint p = control->ClientOrigin;
+    menu->Popup(p.x, p.y + control->Height);
 }
 
 /* Отображает меню выбора пунктов - нажатие клавиши (на клавиатуре)*/
@@ -894,22 +805,12 @@ void __fastcall TFieldActivityForm::PackPageControlDrawTab(
       TCustomTabControl *Control, int TabIndex, const TRect &Rect,
       bool Active)
 {
-    /*if ( !((TPageControl*)Control)->Pages[TabIndex]->TabVisible )
-    {
-        return;
-    }*/
-
     //TPageControl *pageControl = static_cast <TTabControl *> (Control);
     TCanvas *canvas = Control->Canvas;
     // Текст, который будем выводить на вкладке
 
-    //int pageIndex = TabIndex;
     int pageIndex = PageIndexFromTabIndex(((TPageControl*)Control), TabIndex);
 
-    //((TPageControl*)Control)->Pages->TabIndex
-    //int n = ((TPageControl*)Control)->Pages->PageIndex;
-    //int n = ((TPageControl*)Control)->Pages->TabIndex(TabIndex);
-    //int t = ((TPageControl*)Control)->TabIndex;
     AnsiString tabCaption = ((TPageControl*)Control)->Pages[pageIndex]->Caption;
 
     // РИСОВАНИЕ
@@ -927,8 +828,15 @@ void __fastcall TFieldActivityForm::PackPageControlDrawTab(
 /* Должники */
 void __fastcall TFieldActivityForm::DebtorsTabSheetShow(TObject *Sender)
 {
-    showDebtorList( MainDataModule->getAcctOtdelen() );
+    showDebtorList();
 }
+
+void __fastcall TFieldActivityForm::PostListTabSheetShow(TObject *Sender)
+{
+//
+    showPostList();
+}
+
 
 /* Переключили на вкладку Уведомления */
 void __fastcall TFieldActivityForm::PackManualTabSheetShow(TObject *Sender)
@@ -941,7 +849,7 @@ void __fastcall TFieldActivityForm::PackManualTabSheetShow(TObject *Sender)
 void __fastcall TFieldActivityForm::StopListTabSheetShow(TObject *Sender)
 {
     // возможно переделать на show...
-    showStopList( MainDataModule->getAcctOtdelen() );
+    showStopList();
 }
 
 /* Переключили на вкладку Утверждения */
@@ -950,7 +858,7 @@ void __fastcall TFieldActivityForm::ApprovalListTabSheetShow(
 {
     //setCurPackMode(PACK_APPROVE_LIST);
     // возможно переделать на show...
-    showApprovalList( MainDataModule->getAcctOtdelen() );
+    showApprovalList();
 }
 
 /**/
@@ -971,9 +879,7 @@ void __fastcall TFieldActivityForm::refreshActionsStates()
     
 }
 
-
-
-
+/**/
 void __fastcall TFieldActivityForm::refreshFilterControls()
 {
     // Видимость
@@ -1009,7 +915,6 @@ void __fastcall TFieldActivityForm::refreshFilterControls()
     CcDttmIsNullCheckBox->Checked = _currentFilter->getValue("vcl_ctrl", "cc_dttm_is_null");
     CcDttmExistsCheckBox->OnClick = FilterCcDttmChange;
     CcDttmIsNullCheckBox->OnClick = FilterCcDttmChange;
-
 }
 
 /* Реакция на выбор учатка из списка ComboBox */
@@ -1020,12 +925,12 @@ void __fastcall TFieldActivityForm::OtdelenComboBoxClick(TObject *Sender)
     {
     case SHEET_TYPE_DEBTORS:
     {
-        showDebtorList(OtdelenComboBox->KeyValue);
+        showDebtorList();
         break;
     }
     case SHEET_TYPE_STOP:
     {
-        showStopList(OtdelenComboBox->KeyValue);
+        showStopList();
         break;
     }
     case SHEET_TYPE_PACK_STOP_LIST:
@@ -1039,13 +944,13 @@ void __fastcall TFieldActivityForm::OtdelenComboBoxClick(TObject *Sender)
         {
         case MODE_NOTICES:
         {
-            showDebtorList(OtdelenComboBox->KeyValue);
+            showDebtorList();
             break;
         }
 
         case MODE_STOP:
         {
-            showStopList(OtdelenComboBox->KeyValue);
+            showStopList();
             break;
         }
         }
@@ -1076,13 +981,24 @@ void __fastcall TFieldActivityForm::printDocumentFaNoticesListActionExecute(TObj
 
 }
 
-
-/**/
+/* Создать реестр уведомлений контролеру */
 void __fastcall TFieldActivityForm::createFaPackActionExecute(TObject *Sender)
 {
-    String faPackId = MainDataModule->createPackNotice();
-    //String faPackId = MainDataModule->createPack(_currentFilter, TPackTypeCd::PACK_MANUAL, MainDataModule->getAcctOtdelen());
-    showFaPack(faPackId);
+
+    String faPackId = MainDataModule->createPackNotice(FPT_MANUAL);
+    if (faPackId != "" )
+    {
+        WaitForm->Execute(2);
+        //String faPackId = MainDataModule->createPack(_currentFilter, TPackTypeCd::PACK_MANUAL, MainDataModule->getAcctOtdelen());
+        showFaPack(faPackId);
+        MainDataModule->closeDebtorsQuery();
+        //MessageBoxInf("Создан реестр с номером " + faPackId + ".\nНе забудьте ввести даты контактов.");
+        WaitForm->StopWait();
+    }
+    else
+    {
+        MessageBoxStop("Не удалось создать реестр!\nОбратитесь к системному администратору.");
+    }
 }
 
 /**/
@@ -1094,7 +1010,6 @@ void __fastcall TFieldActivityForm::approveFaPackCcDttmActionExecute(TObject *Se
     {
         MainDataModule->setCcApprovalDttmSelected();
     }
-    
 }
 
 /* Выделить с датой контакта более 3 месяцев*/
@@ -1116,14 +1031,14 @@ void __fastcall TFieldActivityForm::checkWithoutCcActionExecute(
 void __fastcall TFieldActivityForm::checkAllActionExecute(TObject *Sender)
 {
     _currentDbGrid->setCheckFiltered(true);
-    SelectAllCheckBox->Checked = true;
+//    SelectAllCheckBox->Checked = true;
 }
 
 /* Снять пометки */
 void __fastcall TFieldActivityForm::checkNoneActionExecute(TObject *Sender)
 {
     _currentDbGrid->setCheckFiltered(false);
-    SelectAllCheckBox->Checked = false;
+//    SelectAllCheckBox->Checked = false;
 }
 
 
@@ -1137,115 +1052,6 @@ void __fastcall TFieldActivityForm::DBGridAltManualCellClick(
     }
 }
 
-/* Обновление при обращении */
-void __fastcall TFieldActivityForm::ActionList1Update(TBasicAction *Action,
-      bool &Handled)
-{
-
-    //((TAction*)ActionList1->Actions[0])->Visible = false;
-    //((TAction*)Action)->Visible = false;
-    //std::vector<TAction*>::iterator it;
-   // it = find(_currentMode->currentSheet->actions.begin(), _currentMode->currentSheet->actions.end(), Action);
-
-    /*if (it != _currentMode->currentSheet->actions.end())
-    {
-        Action->en
-
-        //std::cout << "Element found in myvector: " << *it << '\n';
-    }
-    else
-    {
-        //std::cout << "Element not found in myvector\n";
-    }*/
-
-
-
-
-    //Временно закоментированно 2017-02-14
-
-
-    if (Action->Tag != 1) // Для обработки Update 1 раз
-    {
-        return;
-    }
-
-
-    int checkedCount = _currentDbGrid->getSum("", "CHECK_DATA = 1", false).first;
-    bool bChecked = checkedCount > 0;
-
-    switch(_currentMode->currentSheet->packModeId)
-    {
-    case SHEET_TYPE_DEBTORS:
-    {
-        checkAllAction->Enabled = true;
-        checkNoneAction->Enabled = true;
-        checkWithoutCcAction->Enabled  = true;
-        checkWithCcLess3MonthAction->Enabled = true;
-
-        createFaPackAction->Enabled = bChecked;
-        break;
-    }
-    case SHEET_TYPE_NOTICES_PACK:
-    {
-        checkAllAction->Enabled = true;
-        checkNoneAction->Enabled = true;
-        checkWithoutCcAction->Enabled  = true;
-        checkWithCcLess3MonthAction->Enabled = true;
-
-        printDocumentFaNoticesAction->Enabled = bChecked;
-        printDocumentFaNoticesListAction->Enabled = bChecked;
-        break;
-    }
-    case SHEET_TYPE_APPROVE:
-    {
-        checkAllAction->Enabled = true;
-        checkNoneAction->Enabled = true;
-        checkWithoutCcAction->Enabled  = true;
-        checkWithCcLess3MonthAction->Enabled = true;
-
-        approveFaPackCcDttmAction->Enabled = bChecked;
-        break;
-    }
-        case SHEET_TYPE_STOP:
-    {
-
-        checkAllAction->Enabled = true;
-        checkNoneAction->Enabled = true;
-        checkWithoutCcAction->Enabled  = true;
-        checkWithCcLess3MonthAction->Enabled = true;
-
-        createFaPackStopAction->Enabled = true;
-
-        break;
-    }
-    case SHEET_TYPE_PACK_STOP_LIST:
-    {
-        checkAllAction->Enabled = true;
-        checkNoneAction->Enabled = true;
-        checkWithoutCcAction->Enabled  = true;
-        checkWithCcLess3MonthAction->Enabled = true;
-
-        printDocumentStopAction->Enabled = bChecked;
-
-        break;
-    }
-    case SHEET_TYPE_STOP_PACK:
-    {
-
-        checkAllAction->Enabled = true;
-        checkNoneAction->Enabled = true;
-        checkWithoutCcAction->Enabled  = true;
-        checkWithCcLess3MonthAction->Enabled = true;
-
-        printDocumentStopAction->Enabled = bChecked;
-
-        break;
-    }
-    }
-
-    //Handled = true;
-}
-
 /* Печать заявок на ограничение */
 void __fastcall TFieldActivityForm::printDocumentStopActionExecute(
       TObject *Sender)
@@ -1256,7 +1062,6 @@ void __fastcall TFieldActivityForm::printDocumentStopActionExecute(
 /* Задает текущий режим работы программы */
 void __fastcall TFieldActivityForm::setMode(int index)
 {
-
     PackPageControl->Visible = false; // В будущем попробовать с отключением OnChange
 
     // Сначала прячем вообще все вкладки
@@ -1269,9 +1074,6 @@ void __fastcall TFieldActivityForm::setMode(int index)
     _currentMode = (TModeItem*)SelectModeComboBox->Items->Objects[index];
     _currentMode->showSheets();
     _currentMode->showSheet(0);
-
-    //_currentMode->currentSheet
-
 
 
     PackPageControl->Visible = true;
@@ -1289,14 +1091,12 @@ void __fastcall TFieldActivityForm::createFaPackStopActionExecute(
     showPackStopList();
 
 }
-//---------------------------------------------------------------------------
 
-
+//
 void __fastcall TFieldActivityForm::PackStopTabSheetShow(
       TObject *Sender)
 {
     showFaPack(MainDataModule->getFaPackId_Stop());
-
 }
 
 
@@ -1306,17 +1106,22 @@ void __fastcall TFieldActivityForm::PackRefuseStopTabSheetShow(
     //showFaPack(MainDataModule->getFaPackId_Stop());
 
 }
-//---------------------------------------------------------------------------
-
+/* Выделение элементов с помощью CheckBox */
 void __fastcall TFieldActivityForm::SelectAllCheckBoxClick(TObject *Sender)
 {
-    if (  ((TCheckBox*)Sender)->Checked )
+    switch( ((TCheckBox*)Sender)->State )
+    {
+    case cbChecked:
+    case cbGrayed:
     {
         checkAllAction->Execute();
+        break;
     }
-    else
+    case cbUnchecked:
     {
         checkNoneAction->Execute();
+        break;
+    }
     }
 }
 //---------------------------------------------------------------------------
@@ -1335,5 +1140,44 @@ void __fastcall TFieldActivityForm::OnQueryAfterExecute(TObject *Sender)
     //WaitForm->Close();
 }
 
+/**/
+void __fastcall TFieldActivityForm::checkAllActionUpdate(TObject *Sender)
+{
+    static_cast<TAction*>(Sender)->Enabled = _recordCount > 0;
+}
 
+/**/
+void __fastcall TFieldActivityForm::createFaPackNoticeActionUpdate(
+      TObject *Sender)
+{
+    static_cast<TAction*>(Sender)->Enabled = _checkedCount > 0;
+}
+//---------------------------------------------------------------------------
+/**/
+void __fastcall TFieldActivityForm::OnChangeFilter(TObject *Sender)
+{
+    refreshCheckedCount();
+}
+
+
+/**/
+void __fastcall TFieldActivityForm::createFaPackPostActionExecute(
+      TObject *Sender)
+{
+    String faPackId = MainDataModule->createPackNotice(FPT_POST);
+    if (faPackId != "" )
+    {
+        WaitForm->Execute(2);
+        showFaPack(faPackId);
+        MainDataModule->closeDebtorsQuery();
+        //MessageBoxInf("Создан реестр с номером " + faPackId + ".\nНе забудьте ввести даты контактов.");
+        WaitForm->StopWait();
+    }
+    else
+    {
+        MessageBoxStop("Не удалось создать реестр!\nОбратитесь к системному администратору.");
+    }
+
+}
+//---------------------------------------------------------------------------
 

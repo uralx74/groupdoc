@@ -20,6 +20,7 @@ __fastcall TThreadDataSet::TThreadDataSet(bool CreateSuspended, TOraQuery* query
 
     _dataSet = new TOraQuery(NULL);
     _dataSet->Assign(query);
+    _dataSet->FetchAll = true;
 
     _oraSession->AssignConnect(query->Session);
     _dataSet->Session = _oraSession;

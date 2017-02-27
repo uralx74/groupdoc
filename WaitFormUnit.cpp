@@ -11,16 +11,20 @@ TWaitForm *WaitForm;
 //---------------------------------------------------------------------------
 __fastcall TWaitForm::TWaitForm(TComponent* Owner)
     //: TForm( (TComponent*)(NULL))
-    : TForm(Owner)
+    : TForm(Owner),
+    _waitBeforeShow(0)
 {
     _parentForm = (TForm*)Owner;
     SetMessage("");
     SetStatus("");
+    this->WindowProc = MyWndProc;
+
 }
 
 /**/
 void __fastcall TWaitForm::Timer1Timer(TObject *Sender)
 {
+
     static int FrameIndex = 0;
     if (++FrameIndex >= ImageList1->Count)
     {
@@ -41,18 +45,6 @@ void __fastcall TWaitForm::FormCreate(TObject *Sender)
     this->DoubleBuffered = true;
 }
 
-/**/
-void __fastcall TWaitForm::FormShow(TObject *Sender)
-{
-    Timer1->Enabled = true;
-}
-
-/**/
-void __fastcall TWaitForm::FormHide(TObject *Sender)
-{
-    Timer1->Enabled = false;
-
-}
 
 /**/
 void __fastcall TWaitForm::FormCloseQuery(TObject *Sender, bool &CanClose)
@@ -61,40 +53,35 @@ void __fastcall TWaitForm::FormCloseQuery(TObject *Sender, bool &CanClose)
 }
 
 /**/
-void __fastcall TWaitForm::FormActivate(TObject *Sender)
-{
-    /*((TForm*)Sender)->Enabled = false;
-    Show();*/
-}
-
-/**/
-void __fastcall TWaitForm::FormDeactivate(TObject *Sender)
-{
-    /*((TForm*)Sender)->Enabled = true;
-    Hide();*/
-}
-
-/**/
 void __fastcall TWaitForm::SpeedButton1Click(TObject *Sender)
 {
     SendMessage(Application->MainForm->Handle, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 }
 
-/**/
-void __fastcall TWaitForm::Execute()
+/* ќтображает форму ожидани€ */
+void __fastcall TWaitForm::Execute(int waitBeforeShow)
 {
     //((TForm*)this->Owner)->Enabled = false;
+    Timer1->Enabled = true;
+    ShowTimer->Enabled = true;
     _parentForm->Enabled = false;
     _canClose = false;
-    Show();
+
+    _startTime = Now();
+
+    _waitBeforeShow = waitBeforeShow;
+    
+    Application->ProcessMessages();
 }
 
-/**/
-void __fastcall TWaitForm::Close()
+/* «акрывает форму ожидани€ */
+void __fastcall TWaitForm::StopWait()
 {
     _parentForm->Enabled = true;
+    Timer1->Enabled = false;
+    ShowTimer->Enabled = false;
     _canClose = true;
-    TForm::Close();
+    Close();
 }
 
 /**/
@@ -107,5 +94,42 @@ void __fastcall TWaitForm::SetStatus(const String& text)
 void __fastcall TWaitForm::SetMessage(const String& text)
 {
     MessageLabel->Caption = text;
+}
+
+/* ќбеспечивает задержку перед отображением окна */
+void __fastcall TWaitForm::ShowTimerTimer(TObject *Sender)
+{
+    if ( _waitBeforeShow <= SecondsBetween(Now(), _startTime) )
+    {
+        _parentForm->Enabled = false;
+        Show();
+        ShowTimer->Enabled = false;
+    }
+}
+
+/* ѕерехватываем оконное сообщение дл€ обработки ситуации, когда разворачиваетс€
+   уже закрытое будучи свернутым окно */
+void __fastcall TWaitForm::MyWndProc(Messages::TMessage &Message)
+{
+    // WM_SHOWWINDOW
+    // wParam
+    // Indicates whether a window is being shown. If wParam is TRUE, the window is being shown. If wParam is FALSE, the window is being hidden.
+
+    if (Message.Msg == WM_SHOWWINDOW )
+    {
+        if (Message.WParam == 1 && !this->Showing)
+        {
+
+        }
+        else
+        {
+            WndProc(Message);
+        }
+    }
+    else
+    {
+        WndProc(Message);
+    }
+
 }
 

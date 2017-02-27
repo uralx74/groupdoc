@@ -37,7 +37,6 @@ __published:	// IDE-managed Components
     TEdit *Edit1;
     TGroupBox *GroupBox3;
     TLabel *Label5;
-    TButton *Button5;
     TDBLookupComboBox *OtdelenComboBox2;
     TActionList *ActionList1;
     TButton *Button6;
